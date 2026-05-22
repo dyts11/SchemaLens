@@ -14,9 +14,12 @@ Output:
     results/results.csv   — one row per (question, condition, model)
 
 Columns in results.csv:
-    question_id, db_id, difficulty,
+    question_id, db_id, difficulty, question_type,
     structural_level, semantic_level, model,
-    predicted_sql, outcome, correct, error_msg
+    gold_sql, predicted_sql, outcome, correct, error_msg
+
+Questions are loaded from dev_20240627/arcwise_plat_sql.json; difficulty and
+question_type are joined from dev.json and question_types.json by question_id.
 """
 
 import csv
@@ -25,30 +28,37 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Dict, FrozenSet, List, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-# Load API keys from .env file if present
+# Load schema_effect/.env; overrides any API keys exported in the shell.
 try:
     from dotenv import load_dotenv
-    load_dotenv(Path(__file__).parent / ".env")
+    load_dotenv(Path(__file__).parent / ".env", override=True)
 except ImportError:
     pass  # dotenv not installed — keys must be set as environment variables
 
 from src.schema_builder import SchemaBuilder
 from src.prompt_builder import build_prompt
 from src.llm_runner import call_llm
-from src.evaluator import evaluate, build_col_rename_map, open_l1_eval_connection
-from to_1nf.convert import view_ddls
+from src.evaluator import (
+    evaluate,
+    build_col_rename_map,
+    build_l1_col_rename_map,
+    build_l2_col_rename_map,
+)
+from preprocess_data.questions.question_classifier import load_question_types
 
 # ---------------------------------------------------------------------------
 # Configuration — edit this section to change what gets run
 # ---------------------------------------------------------------------------
 
 DATA_DIR = "dev_20240627"
+ARCWISE_QUESTIONS_PATH = os.path.join(DATA_DIR, "arcwise_plat_sql.json")
+DEV_JSON_PATH = os.path.join(DATA_DIR, "dev.json")
 RESULTS_DIR = "results"
-
+QUESTIONS_DIR = "preprocess_data/questions"
 
 def results_file(model: str, struct_level: int, sem_level: int) -> str:
     """Return the CSV path for a specific (model, condition) combination.
@@ -59,19 +69,21 @@ def results_file(model: str, struct_level: int, sem_level: int) -> str:
 
 # Conditions to run: list of (structural_level, semantic_level) tuples
 CONDITIONS = [
-    (1, 3),   # L3 · S3
+    (struct, sem)
+    for struct in range(1, 7)   # L1–L6
+    for sem in range(1, 4)      # S1–S3
 ]
 
 # Models to run
 MODELS = [
-    "llama-3.3-70b-or",       # Llama 3.3 70B via OpenRouter (working, free)
-    #"gemini-2.5-flash",
+    "gemini-3.5-flash",
 ]
 
 # Per-model delay in seconds between API calls to respect rate limits.
 MODEL_DELAY = {
     "gemini-2.0-flash":   3,
     "gemini-2.5-flash":   1,
+    "gemini-3.5-flash":   1,
     "llama-3.3-70b-or":   1,
     "llama-3.1-8b-or":    1,
     "qwen2.5-coder-32b":  2,
@@ -80,24 +92,16 @@ MODEL_DELAY = {
 }
 DELAY_BETWEEN_CALLS = 3  # fallback if model not in MODEL_DELAY
 
-# Question selection
-# ------------------
-# Set STRATIFIED_DB_SAMPLE to a non-empty list of (db_id, n) to take the first n
-# questions for each database in dev.json file order (deterministic; same ids
-# every run). Set to None to instead take the first MAX_QUESTIONS rows from
-# dev.json as a single prefix (original behaviour).
-#
-# Example: 4 × 25 = 100 questions from four databases.
-STRATIFIED_DB_SAMPLE = [
-    ("formula_1", 25),
-    ("financial", 25),
-    ("card_games", 25),
-    ("student_club", 25),  # fourth DB — replace if you want a different one (≥25 qs in dev)
-]
+# Question selection (from arcwise_plat_sql.json)
+# ---------------------------------------------------------------------------
+# Full arcwise run (9 DBs): set STRATIFIED_DB_SAMPLE = None and keep exclusions below.
+# Pilot (100 qs): set STRATIFIED_DB_SAMPLE to a list of (db_id, n) — exclusions still apply.
+ARCWISE_EXCLUDED_DB_IDS = frozenset({"card_games", "codebase_community"})
 
-# Used only when STRATIFIED_DB_SAMPLE is None.
-# Set to None to run all 1534 questions.
-MAX_QUESTIONS = 100
+STRATIFIED_DB_SAMPLE: Optional[List[Tuple[str, int]]] = None
+
+# Used only when STRATIFIED_DB_SAMPLE is None. None = all questions after filters.
+MAX_QUESTIONS: Optional[int] = None
 
 
 def select_questions(
@@ -105,19 +109,23 @@ def select_questions(
     *,
     stratified_slices: Optional[List[Tuple[str, int]]],
     max_prefix: Optional[int],
+    exclude_db_ids: Optional[FrozenSet[str]] = None,
 ) -> List[dict]:
     """
-    Return the question list for this run.
+    Subset questions for this run.
 
-    If stratified_slices is a non-empty list of (db_id, n), take the first n
-    questions for each db_id in the order they appear in all_questions (dev.json
-    order). Otherwise take all_questions[:max_prefix] (or all if max_prefix is None).
+    If exclude_db_ids is set, drop questions for those db_id values first.
+    If stratified_slices is set, take the first n questions per db_id in the
+    order they appear in arcwise_plat_sql.json. Otherwise take a prefix of
+    all_questions (or all if max_prefix is None).
     """
+    if exclude_db_ids:
+        all_questions = [q for q in all_questions if q["db_id"] not in exclude_db_ids]
+
     if stratified_slices:
-        by_db: dict[str, List[dict]] = {}
+        by_db: Dict[str, List[dict]] = {}
         for q in all_questions:
-            db = q["db_id"]
-            by_db.setdefault(db, []).append(q)
+            by_db.setdefault(q["db_id"], []).append(q)
 
         picked: List[dict] = []
         for db_id, n in stratified_slices:
@@ -125,7 +133,7 @@ def select_questions(
             if len(bucket) < n:
                 raise ValueError(
                     f"Stratified sample: database {db_id!r} has only {len(bucket)} "
-                    f"questions in dev.json but {n} were requested."
+                    f"questions in arcwise_plat_sql.json but {n} were requested."
                 )
             picked.extend(bucket[:n])
         return picked
@@ -133,6 +141,54 @@ def select_questions(
     if max_prefix is not None:
         return all_questions[:max_prefix]
     return list(all_questions)
+
+
+def load_experiment_questions(
+    arcwise_path: str = ARCWISE_QUESTIONS_PATH,
+    dev_json_path: str = DEV_JSON_PATH,
+    questions_dir: str = QUESTIONS_DIR,
+) -> List[dict]:
+    """
+    Load the experiment question set from arcwise_plat_sql.json and attach
+    difficulty (dev.json) and question_type (question_types.json) by question_id.
+    """
+    with open(arcwise_path, encoding="utf-8") as f:
+        arcwise = json.load(f)
+
+    with open(dev_json_path, encoding="utf-8") as f:
+        dev_by_id: Dict[int, dict] = {
+            int(q["question_id"]): q for q in json.load(f)
+        }
+
+    types_by_id = load_question_types(questions_dir)
+
+    questions: List[dict] = []
+    for rec in arcwise:
+        qid = int(rec["question_id"])
+        dev_rec = dev_by_id.get(qid)
+        if dev_rec is None:
+            raise KeyError(
+                f"question_id {qid} in {arcwise_path} not found in {dev_json_path}"
+            )
+        type_rec = types_by_id.get(qid)
+        if type_rec is None:
+            raise KeyError(
+                f"question_id {qid} missing from question_types.json "
+                f"(run classify_questions.py)"
+            )
+        questions.append(
+            {
+                "question_id": qid,
+                "db_id": rec["db_id"],
+                "question": rec["question"],
+                "SQL": rec["SQL"],
+                "evidence": rec.get("evidence", ""),
+                "difficulty": dev_rec["difficulty"],
+                "question_type": type_rec["question_type"],
+            }
+        )
+    return questions
+
 
 # ---------------------------------------------------------------------------
 # CSV schema
@@ -142,6 +198,7 @@ CSV_COLUMNS = [
     "question_id",
     "db_id",
     "difficulty",
+    "question_type",
     "structural_level",
     "semantic_level",
     "model",
@@ -153,19 +210,10 @@ CSV_COLUMNS = [
 ]
 
 
-def load_completed(csv_path: str) -> set:
-    """
-    Read an existing results CSV and return the set of completed question_ids
-    so we can skip them on resume. Each file covers one (model, condition) pair.
-    """
-    completed, _ = load_completed_with_correct(csv_path)
-    return completed
-
-
 def load_completed_with_correct(csv_path: str) -> Tuple[set, int]:
     """
-    Same as load_completed, but also returns how many completed rows were correct
-    (for accurate progress / final summary when resuming a partial run).
+    Read an existing results CSV: completed question_ids and count of correct rows
+    (for resume skipping and accurate progress / final summary).
     """
     completed = set()
     n_correct = 0
@@ -190,6 +238,47 @@ def append_row(csv_path: str, row: dict) -> None:
         writer.writerow(row)
 
 
+def validate_run_prerequisites(
+    questions: List[dict],
+    conditions: List[Tuple[int, int]],
+) -> None:
+    """
+    Fail fast if required SQLite files or schema support are missing for this run.
+    """
+    from src.schema_builder import L1_DB_IDS, L2_DB_IDS
+
+    db_ids = sorted({q["db_id"] for q in questions})
+    struct_levels = {sl for sl, _ in conditions}
+    missing: List[str] = []
+
+    for db_id in db_ids:
+        p3 = os.path.join(DATA_DIR, "dev_databases", db_id, f"{db_id}.sqlite")
+        if not os.path.isfile(p3):
+            missing.append(f"3NF: {p3}")
+
+        if 1 in struct_levels:
+            if db_id not in L1_DB_IDS:
+                missing.append(
+                    f"L1: no 1NF spec for {db_id!r} (supported: {sorted(L1_DB_IDS)})"
+                )
+            elif not SchemaBuilder.has_one_nf_database(DATA_DIR, db_id):
+                missing.append(f"L1: {SchemaBuilder.one_nf_sqlite_path(DATA_DIR, db_id)}")
+
+        if 2 in struct_levels:
+            if db_id not in L2_DB_IDS:
+                missing.append(
+                    f"L2: no 2NF spec for {db_id!r} (supported: {sorted(L2_DB_IDS)})"
+                )
+            elif not SchemaBuilder.has_two_nf_database(DATA_DIR, db_id):
+                missing.append(f"L2: {SchemaBuilder.two_nf_sqlite_path(DATA_DIR, db_id)}")
+
+    if missing:
+        raise FileNotFoundError(
+            "Missing databases or unsupported db_id for selected CONDITIONS:\n"
+            + "\n".join(f"  - {m}" for m in missing)
+        )
+
+
 def print_progress(done: int, total: int, correct: int, condition: str, model: str) -> None:
     acc = correct / done if done > 0 else 0.0
     pct = done / total * 100
@@ -202,27 +291,41 @@ def print_progress(done: int, total: int, correct: int, condition: str, model: s
 
 
 def run() -> None:
-    # Load questions
-    questions_path = os.path.join(DATA_DIR, "dev.json")
-    with open(questions_path, encoding="utf-8") as f:
-        questions = json.load(f)
-    print(f"Loaded {len(questions)} questions from {questions_path}")
+    all_questions = load_experiment_questions()
+    print(
+        f"Loaded {len(all_questions)} questions from {ARCWISE_QUESTIONS_PATH} "
+        f"(difficulty from {DEV_JSON_PATH}, types from question_types.json)"
+    )
 
     stratified = STRATIFIED_DB_SAMPLE if STRATIFIED_DB_SAMPLE else None
     questions = select_questions(
-        questions,
+        all_questions,
         stratified_slices=stratified,
         max_prefix=MAX_QUESTIONS,
+        exclude_db_ids=ARCWISE_EXCLUDED_DB_IDS,
     )
     if stratified:
-        print("Question selection: stratified (first n per db in dev.json order)")
+        print("Question selection: stratified (first n per db in arcwise file order)")
         for db_id, n in stratified:
             print(f"  {db_id}: {n} questions")
-        print(f"Total selected: {len(questions)}")
-    elif MAX_QUESTIONS is not None:
-        print(f"TEST MODE — first {MAX_QUESTIONS} questions from dev.json (prefix)")
     else:
-        print("Running on full dev set (all questions)")
+        from collections import Counter
+
+        by_db = Counter(q["db_id"] for q in questions)
+        print(
+            "Question selection: all arcwise questions in 9 databases "
+            f"(excluding {', '.join(sorted(ARCWISE_EXCLUDED_DB_IDS))})"
+        )
+        for db_id in sorted(by_db):
+            print(f"  {db_id}: {by_db[db_id]} questions")
+    if MAX_QUESTIONS is not None:
+        print(f"  (then truncated to first {MAX_QUESTIONS} in file order)")
+    print(f"Total selected: {len(questions)}")
+
+    n_agg = sum(1 for q in questions if q["question_type"] == "aggregate")
+    print(f"  {n_agg} aggregate, {len(questions) - n_agg} retrieval")
+
+    validate_run_prerequisites(questions, CONDITIONS)
 
     # Pre-build one SchemaBuilder per database (reused across conditions)
     db_ids = list({q["db_id"] for q in questions})
@@ -233,9 +336,23 @@ def run() -> None:
     # so the evaluator can run predicted SQL against correctly-named views.
     # Returns None when no renaming is needed (e.g. S3 with original names).
     sem_levels_needed = {sem for _, sem in CONDITIONS}
+    from src.schema_builder import L1_DB_IDS, L2_DB_IDS
+
     rename_maps = {
         (db_id, sem): build_col_rename_map(db_id, DATA_DIR, sem)
         for db_id in db_ids
+        for sem in sem_levels_needed
+    }
+    l1_rename_maps = {
+        (db_id, sem): build_l1_col_rename_map(db_id, DATA_DIR, sem)
+        for db_id in db_ids
+        if db_id in L1_DB_IDS
+        for sem in sem_levels_needed
+    }
+    l2_rename_maps = {
+        (db_id, sem): build_l2_col_rename_map(db_id, DATA_DIR, sem)
+        for db_id in db_ids
+        if db_id in L2_DB_IDS
         for sem in sem_levels_needed
     }
 
@@ -264,7 +381,7 @@ def run() -> None:
             print(f"  Completed : {done}  |  Remaining: {remaining}")
             print(f"{'='*60}")
 
-            l1_conn_by_db = {}
+            pred_conn_by_db = {}
             try:
                 for q in questions:
                     # Skip if already done (checkpoint)
@@ -280,62 +397,93 @@ def run() -> None:
                     schema = builders[db_id].build(struct_level, sem_level)
 
                     # Build prompt
-                    prompt = build_prompt(schema, q["question"])
-
-                    # Heartbeat: progress only updates after the LLM returns
-                    print(
-                        f"  → LLM {model}  q_id={q['question_id']}  db={db_id}  "
-                        f"prompt_len={len(prompt)}",
-                        flush=True,
+                    prompt = build_prompt(
+                        schema, q["question"], structural_level=struct_level
                     )
 
-                    # Call LLM
+                    #print(
+                    #    f"\n  → question_id={q['question_id']} ({db_id}) "
+                    #    f"[{condition_label}] calling LLM…",
+                    #    flush=True,
+                    #)
+                    t_llm = time.time()
                     predicted_sql = call_llm(model, prompt)
-                    print(
-                        f"  ⇠ LLM returned ({len(predicted_sql)} chars)",
-                        flush=True,
-                    )
+                    #print(
+                    #    f"  ← LLM returned in {time.time() - t_llm:.1f}s "
+                    #    f"(pred len={len(predicted_sql or '')})",
+                    #    flush=True,
+                    #)
 
-                    if struct_level == 1:
-                        if db_id not in l1_conn_by_db:
-                            print(
-                                f"  [L1] Installing wide TEMP VIEWs for {db_id} "
-                                f"(one-time per DB; large joins can take minutes)…",
-                                flush=True,
+                    if struct_level in (1, 2):
+                        from src.evaluator import _build_pred_connection
+
+                        if struct_level == 1:
+                            mat_path = str(
+                                SchemaBuilder.one_nf_sqlite_path(DATA_DIR, db_id)
                             )
-                            ddls = view_ddls(
-                                builders[db_id].get_one_nf_plan(sem_level)
+                            if not SchemaBuilder.has_one_nf_database(DATA_DIR, db_id):
+                                raise FileNotFoundError(
+                                    f"Missing 1NF DB for {db_id}: {mat_path}\n"
+                                    f"Build: python3 -m preprocess_data.to_1nf.build_sqlite "
+                                    f"--db {db_id}"
+                                )
+                            mat_rename = l1_rename_maps.get((db_id, sem_level))
+                        else:
+                            mat_path = str(
+                                SchemaBuilder.two_nf_sqlite_path(DATA_DIR, db_id)
                             )
-                            l1_conn_by_db[db_id] = open_l1_eval_connection(
-                                db_path, ddls
+                            if not SchemaBuilder.has_two_nf_database(DATA_DIR, db_id):
+                                raise FileNotFoundError(
+                                    f"Missing 2NF DB for {db_id}: {mat_path}\n"
+                                    f"Build: python3 -m preprocess_data.to_2nf.build_sqlite "
+                                    f"--db {db_id}"
+                                )
+                            mat_rename = l2_rename_maps.get((db_id, sem_level))
+
+                        conn_key = (db_id, struct_level)
+                        if conn_key not in pred_conn_by_db:
+                            pred_conn_by_db[conn_key] = _build_pred_connection(
+                                mat_path, mat_rename or {}
                             )
-                            print(f"  [L1] Ready for {db_id}.", flush=True)
+                        #print("  → evaluating SQL…", flush=True)
+                        t_eval = time.time()
                         result = evaluate(
                             db_path,
                             predicted_sql,
                             q["SQL"],
-                            None,
-                            None,
-                            l1_conn_by_db[db_id],
-                            verbose=True,
-                        )
-                    else:
-                        col_rename_map = rename_maps.get((db_id, sem_level))
-                        result = evaluate(
-                            db_path,
-                            predicted_sql,
-                            q["SQL"],
-                            col_rename_map,
-                            None,
-                            None,
+                            col_rename_map=mat_rename,
+                            predicted_db_path=mat_path,
+                            pred_reuse_connection=pred_conn_by_db[conn_key],
                             verbose=False,
                         )
+                        #print(
+                        #    f"  ← eval done in {time.time() - t_eval:.1f}s "
+                        #    f"({result.outcome})",
+                        #    flush=True,
+                        #)
+                    else:
+                        col_rename_map = rename_maps.get((db_id, sem_level))
+                        #print("  → evaluating SQL…", flush=True)
+                        t_eval = time.time()
+                        result = evaluate(
+                            db_path,
+                            predicted_sql,
+                            q["SQL"],
+                            col_rename_map=col_rename_map,
+                            verbose=False,
+                        )
+                        #print(
+                        #    f"  ← eval done in {time.time() - t_eval:.1f}s "
+                        #    f"({result.outcome})",
+                        #    flush=True,
+                        #)
 
                     # Write result immediately (so nothing is lost on crash)
                     row = {
                         "question_id": q["question_id"],
                         "db_id": db_id,
                         "difficulty": q["difficulty"],
+                        "question_type": q["question_type"],
                         "structural_level": struct_level,
                         "semantic_level": sem_level,
                         "model": model,
@@ -356,16 +504,14 @@ def run() -> None:
 
                     print_progress(done, len(questions), correct, condition_label, model)
 
-                    # Rate-limit pause (per-model)
-                    delay = MODEL_DELAY.get(model, DELAY_BETWEEN_CALLS)
-                    time.sleep(delay)
+                    time.sleep(MODEL_DELAY.get(model, DELAY_BETWEEN_CALLS))
             finally:
-                for _c in l1_conn_by_db.values():
+                for _c in pred_conn_by_db.values():
                     try:
                         _c.close()
                     except Exception:
                         pass
-                l1_conn_by_db.clear()
+                pred_conn_by_db.clear()
 
             # Final line for this condition+model
             print()  # newline after \r progress

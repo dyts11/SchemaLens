@@ -5,9 +5,11 @@ Generates a schema representation string for a given (db_id, structural_level, s
 The string is injected into the LLM prompt; the underlying SQLite database is never modified.
 
 Structural levels implemented:
-  L1 - 1NF wide table: one flat TEMP-view table per database (fact-anchored join
-       plan from to_1nf; intentional redundancy).  Evaluation installs the same
-       CREATE TEMP VIEW DDL.
+  L1 - 1NF wide table: one denormalised table per database, read from the
+       materialised ``{db_id}__1nf.sqlite`` file under dev_databases/ (see
+       preprocess_data/to_1nf/build_sqlite.py).  Nine databases (see MATERIALISED_DB_IDS).
+  L2 - 2NF synthetic clusters: multiple denormalised wide tables per database from
+       ``{db_id}__2nf.sqlite`` (see preprocess_data/to_2nf/build_sqlite.py).  Same nine databases as L1.  S1–S4 use rename maps at eval time (physical S3 columns in file).
   L3 - 3NF baseline    : table name + column names only
   L4 - 3NF + metadata  : adds SQLite types, PRIMARY KEY, NOT NULL, plus a short
                          preamble explaining how to read the notation
@@ -18,7 +20,7 @@ Structural levels implemented:
 Semantic levels implemented:
   S1 - Anonymous    : col_a, col_b, col_c … (position-based, per table)
   S2 - Abbreviated  : short developer abbreviations (cust_id, dept_nm …)
-  S3 - Descriptive  : full English column names (curated for all 11 databases)
+  S3 - Descriptive  : full English column names (curated per database)
   S4 - Descriptive+ : S3 names + inline description comments from BIRD CSV files
 
 Usage:
@@ -35,6 +37,25 @@ from pathlib import Path
 from typing import Optional, Union
 
 from src.column_aliases import get_name as _get_alias
+from src.fk_cardinality import fk_cardinality_label
+
+# Databases with materialised L1 / L2 SQLite files under dev_databases/.
+MATERIALISED_DB_IDS = frozenset(
+    {
+        "california_schools",
+        "debit_card_specializing",
+        "european_football_2",
+        "financial",
+        "formula_1",
+        "student_club",
+        "superhero",
+        "thrombosis_prediction",
+        "toxicology",
+    }
+)
+L1_DB_IDS = MATERIALISED_DB_IDS  # alias
+L2_DB_IDS = MATERIALISED_DB_IDS
+L1_TABLE_NAME = "one_nf_0"
 
 
 class SchemaBuilder:
@@ -63,7 +84,7 @@ class SchemaBuilder:
         Generate a schema representation string for the given condition.
 
         Args:
-            structural_level: Integer 1 or 3-6 (L1 wide clusters, or L3-L6).
+            structural_level: Integer 1, 2, or 3-6 (L1/L2 materialised, or L3-L6).
             semantic_level  : Integer 1-4 (S1 anonymous → S4 descriptive+).
 
         Returns:
@@ -75,32 +96,32 @@ class SchemaBuilder:
                 f"semantic_level must be 1, 2, 3, or 4 — got {semantic_level}"
             )
         if structural_level == 1:
-            from to_1nf.convert import format_schema_prompt
-
-            return format_schema_prompt(self.get_one_nf_plan(semantic_level))
+            return self._format_one_nf_schema(semantic_level)
+        if structural_level == 2:
+            return self._format_two_nf_schema(semantic_level)
         if structural_level not in (3, 4, 5, 6):
             raise ValueError(
-                f"structural_level must be 1, 3, 4, 5, or 6 — got {structural_level}"
+                f"structural_level must be 1, 2, 3, 4, 5, or 6 — got {structural_level}"
             )
         return self._format_schema(structural_level, semantic_level)
 
-    def get_one_nf_plan(self, semantic_level: int):
-        """
-        Return (and cache) the OneNfPlan for this database at the given semantic level.
-        Used by run_experiment to install TEMP VIEW DDL for predicted SQL.
-        """
-        from to_1nf.convert import OneNfPlan, build_plan
+    @staticmethod
+    def one_nf_sqlite_path(data_dir: Union[str, Path], db_id: str) -> Path:
+        """Path to the materialised 1NF SQLite file (physical S3 column names)."""
+        return Path(data_dir) / "dev_databases" / db_id / f"{db_id}__1nf.sqlite"
 
-        if not hasattr(self, "_one_nf_plan_cache") or self._one_nf_plan_sem != semantic_level:
-            self._one_nf_plan_cache: OneNfPlan = build_plan(
-                self.db_id, self.data_dir, semantic_level
-            )
-            self._one_nf_plan_sem = semantic_level
-        return self._one_nf_plan_cache
+    @classmethod
+    def has_one_nf_database(cls, data_dir: Union[str, Path], db_id: str) -> bool:
+        return db_id in L1_DB_IDS and cls.one_nf_sqlite_path(data_dir, db_id).is_file()
 
-    def get_l1_plan(self, semantic_level: int):
-        """Alias for :meth:`get_one_nf_plan` (legacy name)."""
-        return self.get_one_nf_plan(semantic_level)
+    @staticmethod
+    def two_nf_sqlite_path(data_dir: Union[str, Path], db_id: str) -> Path:
+        """Path to the materialised 2NF SQLite file (physical S3 column names)."""
+        return Path(data_dir) / "dev_databases" / db_id / f"{db_id}__2nf.sqlite"
+
+    @classmethod
+    def has_two_nf_database(cls, data_dir: Union[str, Path], db_id: str) -> bool:
+        return db_id in L2_DB_IDS and cls.two_nf_sqlite_path(data_dir, db_id).is_file()
 
     # ------------------------------------------------------------------ #
     #  Data loading                                                        #
@@ -253,6 +274,98 @@ class SchemaBuilder:
     #  Schema formatting                                                   #
     # ------------------------------------------------------------------ #
 
+    def _format_one_nf_schema(self, semantic_level: int) -> str:
+        """
+        Build the L1 prompt schema for the requested semantic level.
+
+        The materialised ``{db_id}__1nf.sqlite`` always stores physical S3-style
+        column names; S1/S2/S4 display names are derived from the join plan (same
+        logic as L3–L6).  Evaluation maps display names back via ``build_l1_col_rename_map``.
+        """
+        if self.db_id not in L1_DB_IDS:
+            supported = ", ".join(sorted(L1_DB_IDS))
+            raise ValueError(
+                f"No 1NF database for db_id={self.db_id!r}. Supported: {supported}"
+            )
+        path = self.one_nf_sqlite_path(self.data_dir, self.db_id)
+        if not path.is_file():
+            raise FileNotFoundError(
+                f"1NF database not found: {path}\n"
+                f"Build it with: python3 -m preprocess_data.to_1nf.build_sqlite "
+                f"--db {self.db_id}"
+            )
+
+        from preprocess_data.to_1nf.convert import build_plan
+
+        display_columns = build_plan(
+            self.db_id, self.data_dir, semantic_level=semantic_level
+        ).display_columns
+
+        lines = [
+            "-- L1 · 1NF wide table (denormalised; intentional redundancy).",
+            "-- All attributes appear in a single table — no joins required.",
+            f"-- Query table: {L1_TABLE_NAME}",
+            "",
+            f"TABLE {L1_TABLE_NAME} (",
+            "    " + ",\n    ".join(_quote_if_needed(c) for c in display_columns),
+            ")",
+        ]
+        return "\n".join(lines)
+
+    def _format_two_nf_schema(self, semantic_level: int) -> str:
+        """
+        Build the L2 prompt schema: one TABLE block per materialised cluster.
+
+        ``{db_id}__2nf.sqlite`` stores physical S3-style names; display names for
+        S1/S2/S4 come from ``build_plan`` (same approach as L1).  Evaluation uses
+        ``build_l2_col_rename_map``.
+        """
+        if self.db_id not in L2_DB_IDS:
+            supported = ", ".join(sorted(L2_DB_IDS))
+            raise ValueError(
+                f"No 2NF database for db_id={self.db_id!r}. Supported: {supported}"
+            )
+        path = self.two_nf_sqlite_path(self.data_dir, self.db_id)
+        if not path.is_file():
+            raise FileNotFoundError(
+                f"2NF database not found: {path}\n"
+                f"Build it with: python3 -m preprocess_data.to_2nf.build_sqlite "
+                f"--db {self.db_id}"
+            )
+
+        from preprocess_data.to_2nf.convert import build_plan, _anchor_pk_labels
+        from preprocess_data.to_2nf.specs import SPECS
+
+        plan = build_plan(self.db_id, self.data_dir, semantic_level=semantic_level)
+        spec = SPECS[self.db_id]
+        anchor_pks = _anchor_pk_labels(self.db_id, self.data_dir)
+
+        lines = [
+            "-- L2 · 2NF synthetic clusters (denormalised hubs; not 3NF).",
+            "-- Query the appropriate cluster table; JOIN across clusters when needed.",
+            f"-- Database file: {self.db_id}__2nf.sqlite",
+            "",
+        ]
+        for cluster, cl in zip(plan.clusters, spec.clusters):
+            pk = anchor_pks.get(cl.anchor_table, "?")
+            from preprocess_data.to_2nf.specs import join_step_table
+
+            joined = [join_step_table(s) for s in cl.join_steps]
+            lines.append(
+                f"-- Cluster anchor: {cl.anchor_table} (row key: {pk})"
+            )
+            if joined:
+                lines.append(f"--   joined entities: {', '.join(joined)}")
+            lines.append(f"TABLE {cluster.output_table} (")
+            lines.append(
+                "    "
+                + ",\n    ".join(_quote_if_needed(c) for c in cluster.display_columns)
+            )
+            lines.append(")")
+            lines.append("")
+
+        return "\n".join(lines).rstrip()
+
     def _format_schema(self, structural_level: int, semantic_level: int) -> str:
         """Build the complete schema string for the given condition."""
         table_blocks = []
@@ -343,8 +456,9 @@ class SchemaBuilder:
         if structural_level >= 5 and col["fk_to"]:
             to_table, to_col = col["fk_to"]
             mapped_to_col = _get_alias(self.db_id, to_col, semantic_level)
-            is_sole_pk = col["is_pk"] and not composite_pk
-            cardinality = "one-to-one" if is_sole_pk else "many-to-one"
+            cardinality = fk_cardinality_label(
+                self.db_id, table_name, col["name"], to_table, to_col
+            )
             line += f"  -- FK → {to_table}.{_quote_if_needed(mapped_to_col)} ({cardinality})"
 
         # S4: append column description as an inline comment (only when no FK comment)
@@ -389,45 +503,52 @@ class SchemaBuilder:
         """
         Human-readable preamble for L4+ so types / PK / NOT NULL are obvious in the prompt.
         """
-        lines = [
-            "-- SCHEMA NOTATION (this structural level):",
-            "--   • Each column lists its SQLite storage class / affinity (TEXT, INTEGER, REAL, …).",
-            "--   • PRIMARY KEY marks the column (or column set) that uniquely identifies a row.",
-            "--     For composite keys, a single PRIMARY KEY (col1, col2, …) line appears at the bottom of the table.",
-            "--   • NOT NULL means the database does not allow NULL in that column for stored rows.",
+        body = [
+            "SCHEMA NOTATION (this structural level)",
+            "",
+            "Each column lists its SQLite storage class / affinity (TEXT, INTEGER, REAL, …).",
+            "PRIMARY KEY marks the column (or column set) that uniquely identifies a row.",
+            "For composite keys, a single PRIMARY KEY (col1, col2, …) line appears at the bottom of the table.",
+            "NOT NULL means the database does not allow NULL in that column for stored rows.",
         ]
         if structural_level >= 5:
-            lines.extend(
+            body.extend(
                 [
-                    "--   • Columns that are foreign keys carry an inline note: FK → parent_table.parent_column",
-                    "--     with a cardinality hint (many-to-one vs one-to-one) from the child table's perspective.",
+                    "",
+                    "Columns that are foreign keys carry an inline note: FK → parent_table.parent_column",
+                    "with a cardinality hint (many-to-one vs one-to-one) from the child table's perspective.",
+                    "FK columns that are also part of the primary key are still labelled many-to-one unless",
+                    "the relationship is listed as a verified one-to-one extension (e.g. school detail tables).",
                 ]
             )
         if structural_level >= 6:
-            lines.append(
-                "--   • After all tables: FOREIGN KEY RELATIONSHIPS recap every link, then JOIN PATHS shows"
-            )
-            lines.append(
-                "--     example INNER JOIN … ON … lines you can adapt when writing queries."
+            body.extend(
+                [
+                    "",
+                    "After all tables: FOREIGN KEY RELATIONSHIPS recaps every link in one block.",
+                    "JOIN PATHS lists example INNER JOIN … ON … lines you can adapt when writing queries.",
+                ]
             )
         elif structural_level >= 5:
-            lines.append(
-                "--   • After all tables, FOREIGN KEY RELATIONSHIPS lists every parent/child link in one place."
+            body.append(
+                "After all tables, FOREIGN KEY RELATIONSHIPS lists every parent/child link in one block."
             )
-        return "\n".join(lines)
+        return _block_comment(body)
 
-    def _fk_cardinality(self, from_col_idx: int) -> str:
-        """Cardinality from the child (FK) row toward the parent: one-to-one vs many-to-one."""
+    def _fk_cardinality(self, from_col_idx: int, to_col_idx: int) -> str:
+        """Cardinality from the child (FK) row toward the parent."""
         col_lookup = self._meta["col_lookup"]
-        if from_col_idx not in col_lookup:
+        if from_col_idx not in col_lookup or to_col_idx not in col_lookup:
             return "many-to-one"
-        info = col_lookup[from_col_idx]
-        table = info["table"]
-        is_pk = from_col_idx in self._meta["pk_cols"]
-        composite = self._meta["composite_pks"].get(table)
-        if is_pk and not composite:
-            return "one-to-one"
-        return "many-to-one"
+        from_info = col_lookup[from_col_idx]
+        to_info = col_lookup[to_col_idx]
+        return fk_cardinality_label(
+            self.db_id,
+            from_info["table"],
+            from_info["name"],
+            to_info["table"],
+            to_info["name"],
+        )
 
     def _format_foreign_key_relationships(self, semantic_level: int) -> str:
         """
@@ -439,9 +560,10 @@ class SchemaBuilder:
         if not raw:
             return ""
 
-        lines = [
-            "-- FOREIGN KEY RELATIONSHIPS:",
-            "--   Each line: <child_table>.<child_column> → <parent_table>.<parent_column>  (cardinality from child side)",
+        body = [
+            "FOREIGN KEY RELATIONSHIPS",
+            "Each line: child_table.child_column → parent_table.parent_column (cardinality from child side)",
+            "",
         ]
         for from_idx, to_idx in raw:
             if from_idx not in col_lookup or to_idx not in col_lookup:
@@ -454,20 +576,22 @@ class SchemaBuilder:
             to_name = _quote_if_needed(
                 _get_alias(self.db_id, to_info["name"], semantic_level)
             )
-            card = self._fk_cardinality(from_idx)
-            lines.append(
-                f"--   {from_info['table']}.{from_name} → {to_info['table']}.{to_name}  ({card})"
+            card = self._fk_cardinality(from_idx, to_idx)
+            body.append(
+                f"{from_info['table']}.{from_name} → {to_info['table']}.{to_name} ({card})"
             )
-        return "\n".join(lines)
+        return _block_comment(body)
 
     def _format_join_paths(self, semantic_level: int = 3) -> str:
         """
-        Generate the '-- JOIN PATHS:' block appended at L6.
-        Lists one JOIN expression per FK relationship, using the mapped column names
-        for the given semantic level.
+        Passive JOIN PATHS block for L6 (block comment, not executable SQL).
         """
         col_lookup = self._meta["col_lookup"]
-        lines = ["-- JOIN PATHS:"]
+        body = [
+            "JOIN PATHS",
+            "Example INNER JOIN patterns — adapt table and column names to your query.",
+            "",
+        ]
 
         for from_idx, to_idx in self._meta["foreign_keys_raw"]:
             if from_idx not in col_lookup or to_idx not in col_lookup:
@@ -475,14 +599,13 @@ class SchemaBuilder:
             from_info = col_lookup[from_idx]
             to_info = col_lookup[to_idx]
             from_name = _quote_if_needed(_get_alias(self.db_id, from_info["name"], semantic_level))
-            to_name   = _quote_if_needed(_get_alias(self.db_id, to_info["name"],   semantic_level))
-            lines.append(
-                f"--   {from_info['table']} JOIN {to_info['table']}"
-                f" ON {from_info['table']}.{from_name}"
-                f" = {to_info['table']}.{to_name}"
+            to_name = _quote_if_needed(_get_alias(self.db_id, to_info["name"], semantic_level))
+            body.append(
+                f"{from_info['table']} JOIN {to_info['table']}"
+                f" ON {from_info['table']}.{from_name} = {to_info['table']}.{to_name}"
             )
 
-        return "\n".join(lines)
+        return _block_comment(body)
 
 
 # ---------------------------------------------------------------------------
@@ -505,6 +628,14 @@ def _idx_to_label(n: int) -> str:
         n, r = divmod(n - 1, 26)
         label = chr(ord("a") + r) + label
     return label
+
+
+def _block_comment(lines: list[str]) -> str:
+    """Format lines as a single /* … */ block (passive documentation, not SQL)."""
+    if not lines:
+        return "/* */"
+    inner = "\n".join(lines)
+    return f"/*\n{inner}\n*/"
 
 
 def _quote_if_needed(name: str) -> str:

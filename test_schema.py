@@ -15,9 +15,8 @@ Usage (from the schema_effect/ directory):
     # Compare two specific conditions side-by-side (diff mode)
     python3 test_schema.py --db california_schools --sem 3 --diff 3 4
 
-Available databases:
-    california_schools, card_games, codebase_community,
-    debit_card_specializing, european_football_2, financial,
+L1/L2 materialised databases (L3–L6 also work for card_games, codebase_community):
+    california_schools, debit_card_specializing, european_football_2, financial,
     formula_1, student_club, superhero, thrombosis_prediction, toxicology
 """
 
@@ -31,8 +30,8 @@ from src.schema_builder import SchemaBuilder
 DATA_DIR = "dev_20240627"
 
 LEVEL_LABELS = {
-    1: "L1 · 1NF wide table (fact-anchored join; see to_1nf/specs.py)",
-    2: "L2 · 2NF (partial deps removed)",
+    1: "L1 · 1NF wide table (materialised {db}__1nf.sqlite)",
+    2: "L2 · 2NF clusters (materialised {db}__2nf.sqlite)",
     3: "L3 · 3NF baseline (names only)",
     4: "L4 · 3NF + types / PK / NOT NULL",
     5: "L5 · 3NF + FK + cardinality",
@@ -99,7 +98,7 @@ def main():
     parser.add_argument("--db", default="california_schools",
                         help="Database name (default: california_schools)")
     parser.add_argument("--sl", type=int, default=3,
-                        help="Structural level 1 or 3-6 (default: 3)")
+                        help="Structural level 1, 2, or 3-6 (default: 3)")
     parser.add_argument("--sem", type=int, default=3,
                         help="Semantic level 1-4 (default: 3)")
     parser.add_argument("--all-sl", action="store_true",
@@ -112,11 +111,11 @@ def main():
     if args.diff:
         diff_schemas(args.db, args.sem, args.diff[0], args.diff[1])
     elif args.all_sl:
-        for sl in (3, 4, 5, 6):
+        for sl in (1, 2, 3, 4, 5, 6):
             try:
                 print_schema(args.db, sl, args.sem)
-            except NotImplementedError as e:
-                print(f"\n[L{sl}·S{args.sem}] Not yet implemented: {e}")
+            except (NotImplementedError, FileNotFoundError, ValueError) as e:
+                print(f"\n[L{sl}·S{args.sem}] Skipped: {e}")
     else:
         try:
             print_schema(args.db, args.sl, args.sem)

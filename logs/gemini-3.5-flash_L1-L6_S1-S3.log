@@ -1,0 +1,287 @@
+Loaded 498 questions from dev_20240627/arcwise_plat_sql.json (difficulty from dev_20240627/dev.json, types from question_types.json)
+Question selection: all arcwise questions in 9 databases (excluding card_games, codebase_community)
+  california_schools: 30 questions
+  debit_card_specializing: 30 questions
+  european_football_2: 51 questions
+  financial: 30 questions
+  formula_1: 66 questions
+  student_club: 48 questions
+  superhero: 52 questions
+  thrombosis_prediction: 50 questions
+  toxicology: 40 questions
+Total selected: 397
+  202 aggregate, 195 retrieval
+Building schema metadata for 9 databases...
+
+Total runs planned : 7146
+
+
+============================================================
+  Condition : L1·S1
+  Model     : gemini-3.5-flash
+  Output    : results/gemini-3.5-flash__L1S1.csv
+  Completed : 0  |  Remaining: 397
+============================================================
+
+  → question_id=1471 (debit_card_specializing) [L1·S1] calling LLM…
+/Users/danielsu/Library/Python/3.9/lib/python/site-packages/google/auth/__init__.py:54: FutureWarning: You are using a Python version 3.9 past its end of life. Google will update google-auth with critical bug fixes on a best-effort basis, but not with any other fixes or features. Please upgrade your Python version, and then update google-auth.
+  warnings.warn(eol_message.format("3.9"), FutureWarning)
+/Users/danielsu/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+/Users/danielsu/Library/Python/3.9/lib/python/site-packages/google/oauth2/__init__.py:40: FutureWarning: You are using a Python version 3.9 past its end of life. Google will update google-auth with critical bug fixes on a best-effort basis, but not with any other fixes or features. Please upgrade your Python version, and then update google-auth.
+  warnings.warn(eol_message.format("3.9"), FutureWarning)
+Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+  ← LLM returned in 20.1s (pred len=138)
+  → evaluating SQL…
+  ← eval done in 0.1s (wrong_answer)
+  [L1·S1 | gemini-3.5-flash] 1/397 (0.3%) — accuracy so far: 0.0%
+  → question_id=1472 (debit_card_specializing) [L1·S1] calling LLM…
+Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+  ← LLM returned in 55.4s (pred len=90)
+  → evaluating SQL…
+  ← eval done in 0.2s (wrong_answer)
+  [L1·S1 | gemini-3.5-flash] 2/397 (0.5%) — accuracy so far: 0.0%
+  → question_id=1473 (debit_card_specializing) [L1·S1] calling LLM…
+Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+  ← LLM returned in 26.7s (pred len=118)
+  → evaluating SQL…
+  ← eval done in 0.2s (wrong_answer)
+  [L1·S1 | gemini-3.5-flash] 3/397 (0.8%) — accuracy so far: 0.0%
+  → question_id=1476 (debit_card_specializing) [L1·S1] calling LLM…
+Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+  ← LLM returned in 30.8s (pred len=222)
+  → evaluating SQL…
+  ← eval done in 0.2s (wrong_answer)
+  [L1·S1 | gemini-3.5-flash] 4/397 (1.0%) — accuracy so far: 0.0%
+  → question_id=1479 (debit_card_specializing) [L1·S1] calling LLM…
+Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+  ← LLM returned in 53.1s (pred len=170)
+  → evaluating SQL…
+  ← eval done in 0.2s (wrong_answer)
+  [L1·S1 | gemini-3.5-flash] 5/397 (1.3%) — accuracy so far: 0.0%
+  → question_id=1480 (debit_card_specializing) [L1·S1] calling LLM…
+Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+  ← LLM returned in 75.9s (pred len=205)
+  → evaluating SQL…
+  ← eval done in 0.2s (wrong_answer)
+  [L1·S1 | gemini-3.5-flash] 6/397 (1.5%) — accuracy so far: 0.0%
+  → question_id=1481 (debit_card_specializing) [L1·S1] calling LLM…
+Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+  ← LLM returned in 79.0s (pred len=695)
+  → evaluating SQL…
+  ← eval done in 0.5s (wrong_answer)
+  [L1·S1 | gemini-3.5-flash] 7/397 (1.8%) — accuracy so far: 0.0%
+  → question_id=1482 (debit_card_specializing) [L1·S1] calling LLM…
+Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+  ← LLM returned in 65.0s (pred len=350)
+  → evaluating SQL…
+  ← eval done in 0.2s (wrong_answer)
+  [L1·S1 | gemini-3.5-flash] 8/397 (2.0%) — accuracy so far: 0.0%
+  → question_id=1483 (debit_card_specializing) [L1·S1] calling LLM…
+Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+  ← LLM returned in 54.3s (pred len=131)
+  → evaluating SQL…
+  ← eval done in 0.1s (wrong_answer)
+  [L1·S1 | gemini-3.5-flash] 9/397 (2.3%) — accuracy so far: 0.0%
+  → question_id=1484 (debit_card_specializing) [L1·S1] calling LLM…
+Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+  ← LLM returned in 37.3s (pred len=200)
+  → evaluating SQL…
+  ← eval done in 0.1s (wrong_answer)
+  [L1·S1 | gemini-3.5-flash] 10/397 (2.5%) — accuracy so far: 0.0%
+  → question_id=1486 (debit_card_specializing) [L1·S1] calling LLM…
+Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+  ← LLM returned in 30.3s (pred len=163)
+  → evaluating SQL…
+  ← eval done in 0.0s (wrong_answer)
+  [L1·S1 | gemini-3.5-flash] 11/397 (2.8%) — accuracy so far: 0.0%
+  → question_id=1490 (debit_card_specializing) [L1·S1] calling LLM…
+Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+  ← LLM returned in 20.4s (pred len=129)
+  → evaluating SQL…
+  ← eval done in 0.2s (wrong_answer)
+  [L1·S1 | gemini-3.5-flash] 12/397 (3.0%) — accuracy so far: 0.0%
+  → question_id=1493 (debit_card_specializing) [L1·S1] calling LLM…
+Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+  ← LLM returned in 44.2s (pred len=137)
+  → evaluating SQL…
+  ← eval done in 0.1s (wrong_answer)
+  [L1·S1 | gemini-3.5-flash] 13/397 (3.3%) — accuracy so far: 0.0%
+  → question_id=1498 (debit_card_specializing) [L1·S1] calling LLM…
+Error:  504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired before operation could complete.', 'status': 'DEADLINE_EXCEEDED'}}
+  [Gemini] Transient error — waiting 10s (attempt 1/5)
+Error:  504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired before operation could complete.', 'status': 'DEADLINE_EXCEEDED'}}
+  [Gemini] Transient error — waiting 20s (attempt 2/5)
+Error:  504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired before operation could complete.', 'status': 'DEADLINE_EXCEEDED'}}
+  [Gemini] Transient error — waiting 40s (attempt 3/5)
+Error:  504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired before operation could complete.', 'status': 'DEADLINE_EXCEEDED'}}
+  [Gemini] Transient error — waiting 80s (attempt 4/5)
+Error:  The read operation timed out
+  [Gemini] Error on attempt 5: The read operation timed out
+  ← LLM returned in 1045.6s (pred len=0)
+  → evaluating SQL…
+  ← eval done in 0.0s (error)
+  [L1·S1 | gemini-3.5-flash] 14/397 (3.5%) — accuracy so far: 0.0%
+  → question_id=1500 (debit_card_specializing) [L1·S1] calling LLM…
+Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+  ← LLM returned in 28.2s (pred len=63)
+  → evaluating SQL…
+  ← eval done in 0.0s (wrong_answer)
+  [L1·S1 | gemini-3.5-flash] 15/397 (3.8%) — accuracy so far: 0.0%
+  → question_id=1501 (debit_card_specializing) [L1·S1] calling LLM…
+Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+  ← LLM returned in 66.4s (pred len=63)
+  → evaluating SQL…
+  ← eval done in 0.0s (wrong_answer)
+  [L1·S1 | gemini-3.5-flash] 16/397 (4.0%) — accuracy so far: 0.0%
+  → question_id=1505 (debit_card_specializing) [L1·S1] calling LLM…
+Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+  ← LLM returned in 42.6s (pred len=80)
+  → evaluating SQL…
+  ← eval done in 0.1s (wrong_answer)
+  [L1·S1 | gemini-3.5-flash] 17/397 (4.3%) — accuracy so far: 0.0%
+  → question_id=1506 (debit_card_specializing) [L1·S1] calling LLM…
+Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+  ← LLM returned in 74.9s (pred len=66)
+  → evaluating SQL…
+  ← eval done in 0.0s (wrong_answer)
+  [L1·S1 | gemini-3.5-flash] 18/397 (4.5%) — accuracy so far: 0.0%
+  → question_id=1507 (debit_card_specializing) [L1·S1] calling LLM…
+Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+  ← LLM returned in 71.1s (pred len=52)
+  → evaluating SQL…
+  ← eval done in 0.0s (wrong_answer)
+  [L1·S1 | gemini-3.5-flash] 19/397 (4.8%) — accuracy so far: 0.0%
+  → question_id=1509 (debit_card_specializing) [L1·S1] calling LLM…
+Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+  ← LLM returned in 96.6s (pred len=96)
+  → evaluating SQL…
+  ← eval done in 0.0s (wrong_answer)
+  [L1·S1 | gemini-3.5-flash] 20/397 (5.0%) — accuracy so far: 0.0%
+  → question_id=1514 (debit_card_specializing) [L1·S1] calling LLM…
+Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+  ← LLM returned in 92.5s (pred len=85)
+  → evaluating SQL…
+  ← eval done in 0.0s (wrong_answer)
+  [L1·S1 | gemini-3.5-flash] 21/397 (5.3%) — accuracy so far: 0.0%
+  → question_id=1515 (debit_card_specializing) [L1·S1] calling LLM…
+Error:  504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired before operation could complete.', 'status': 'DEADLINE_EXCEEDED'}}
+  [Gemini] Transient error — waiting 10s (attempt 1/5)
+Error:  504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired before operation could complete.', 'status': 'DEADLINE_EXCEEDED'}}
+  [Gemini] Transient error — waiting 20s (attempt 2/5)
+Error:  504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired before operation could complete.', 'status': 'DEADLINE_EXCEEDED'}}
+  [Gemini] Transient error — waiting 40s (attempt 3/5)
+Error:  The read operation timed out
+  [Gemini] Error on attempt 4: The read operation timed out
+  ← LLM returned in 790.1s (pred len=0)
+  → evaluating SQL…
+  ← eval done in 0.0s (error)
+  [L1·S1 | gemini-3.5-flash] 22/397 (5.5%) — accuracy so far: 0.0%
+  → question_id=1521 (debit_card_specializing) [L1·S1] calling LLM…
+Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+  ← LLM returned in 98.1s (pred len=131)
+  → evaluating SQL…
+  ← eval done in 0.0s (wrong_answer)
+  [L1·S1 | gemini-3.5-flash] 23/397 (5.8%) — accuracy so far: 0.0%
+  → question_id=1524 (debit_card_specializing) [L1·S1] calling LLM…
+Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+  ← LLM returned in 40.4s (pred len=79)
+  → evaluating SQL…
+  ← eval done in 0.0s (wrong_answer)
+  [L1·S1 | gemini-3.5-flash] 24/397 (6.0%) — accuracy so far: 0.0%
+  → question_id=1525 (debit_card_specializing) [L1·S1] calling LLM…
+Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+  ← LLM returned in 35.9s (pred len=135)
+  → evaluating SQL…
+  ← eval done in 0.0s (wrong_answer)
+  [L1·S1 | gemini-3.5-flash] 25/397 (6.3%) — accuracy so far: 0.0%
+  → question_id=1526 (debit_card_specializing) [L1·S1] calling LLM…
+Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+  ← LLM returned in 60.8s (pred len=356)
+  → evaluating SQL…
+  ← eval done in 0.1s (wrong_answer)
+  [L1·S1 | gemini-3.5-flash] 26/397 (6.5%) — accuracy so far: 0.0%
+  → question_id=1528 (debit_card_specializing) [L1·S1] calling LLM…
+Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+  ← LLM returned in 55.9s (pred len=107)
+  → evaluating SQL…
+  ← eval done in 0.0s (wrong_answer)
+  [L1·S1 | gemini-3.5-flash] 27/397 (6.8%) — accuracy so far: 0.0%
+  → question_id=1529 (debit_card_specializing) [L1·S1] calling LLM…
+Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+  ← LLM returned in 27.5s (pred len=115)
+  → evaluating SQL…
+  ← eval done in 0.0s (wrong_answer)
+  [L1·S1 | gemini-3.5-flash] 28/397 (7.1%) — accuracy so far: 0.0%
+  → question_id=1531 (debit_card_specializing) [L1·S1] calling LLM…
+Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+  ← LLM returned in 147.4s (pred len=101)
+  → evaluating SQL…
+  ← eval done in 0.1s (wrong_answer)
+  [L1·S1 | gemini-3.5-flash] 29/397 (7.3%) — accuracy so far: 0.0%
+  → question_id=1533 (debit_card_specializing) [L1·S1] calling LLM…
+Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+  ← LLM returned in 12.8s (pred len=155)
+  → evaluating SQL…
+  ← eval done in 0.1s (wrong_answer)
+  [L1·S1 | gemini-3.5-flash] 30/397 (7.6%) — accuracy so far: 0.0%
+  → question_id=1312 (student_club) [L1·S1] calling LLM…
+Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+  ← LLM returned in 95.2s (pred len=83)
+  → evaluating SQL…
+  ← eval done in 0.0s (wrong_answer)
+  [L1·S1 | gemini-3.5-flash] 31/397 (7.8%) — accuracy so far: 0.0%
+  → question_id=1317 (student_club) [L1·S1] calling LLM…
+Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+  ← LLM returned in 90.9s (pred len=315)
+  → evaluating SQL…
+  ← eval done in 0.0s (wrong_answer)
+  [L1·S1 | gemini-3.5-flash] 32/397 (8.1%) — accuracy so far: 0.0%
+  → question_id=1322 (student_club) [L1·S1] calling LLM…
+Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+  ← LLM returned in 111.2s (pred len=162)
+  → evaluating SQL…
+  ← eval done in 0.0s (wrong_answer)
+  [L1·S1 | gemini-3.5-flash] 33/397 (8.3%) — accuracy so far: 0.0%
+  → question_id=1323 (student_club) [L1·S1] calling LLM…
+Error:  504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired before operation could complete.', 'status': 'DEADLINE_EXCEEDED'}}
+  [Gemini] Transient error — waiting 10s (attempt 1/5)
+Error:  504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired before operation could complete.', 'status': 'DEADLINE_EXCEEDED'}}
+  [Gemini] Transient error — waiting 20s (attempt 2/5)
+Error:  The read operation timed out
+  [Gemini] Error on attempt 3: The read operation timed out
+  ← LLM returned in 570.4s (pred len=0)
+  → evaluating SQL…
+  ← eval done in 0.0s (error)
+  [L1·S1 | gemini-3.5-flash] 34/397 (8.6%) — accuracy so far: 0.0%
+  → question_id=1331 (student_club) [L1·S1] calling LLM…
+Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+  ← LLM returned in 101.4s (pred len=66)
+  → evaluating SQL…
+  ← eval done in 0.0s (wrong_answer)
+  [L1·S1 | gemini-3.5-flash] 35/397 (8.8%) — accuracy so far: 0.0%
+  → question_id=1334 (student_club) [L1·S1] calling LLM…
+Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+  ← LLM returned in 49.4s (pred len=106)
+  → evaluating SQL…
+  ← eval done in 0.0s (error)
+  [L1·S1 | gemini-3.5-flash] 36/397 (9.1%) — accuracy so far: 0.0%
+  → question_id=1338 (student_club) [L1·S1] calling LLM…
+Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+  ← LLM returned in 61.1s (pred len=179)
+  → evaluating SQL…
+  ← eval done in 0.0s (wrong_answer)
+  [L1·S1 | gemini-3.5-flash] 37/397 (9.3%) — accuracy so far: 0.0%
+  → question_id=1339 (student_club) [L1·S1] calling LLM…
+Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+  ← LLM returned in 70.1s (pred len=187)
+  → evaluating SQL…
+  ← eval done in 0.0s (error)
+  [L1·S1 | gemini-3.5-flash] 38/397 (9.6%) — accuracy so far: 0.0%
+  → question_id=1340 (student_club) [L1·S1] calling LLM…
+Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+  ← LLM returned in 80.3s (pred len=206)
+  → evaluating SQL…
+  ← eval done in 0.0s (wrong_answer)
+  [L1·S1 | gemini-3.5-flash] 39/397 (9.8%) — accuracy so far: 0.0%
+  → question_id=1344 (student_club) [L1·S1] calling LLM…

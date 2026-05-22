@@ -40,6 +40,10 @@ MODELS = {
         "provider": "gemini",
         "model_id": "gemini-2.5-flash",
     },
+    "gemini-3.5-flash": {
+        "provider": "gemini",
+        "model_id": "gemini-3.5-flash",
+    },
     "gemini-2.5-pro": {
         "provider": "gemini",
         "model_id": "gemini-2.5-pro",
@@ -83,6 +87,9 @@ _TEMPERATURE = 0
 # Retry on rate-limit errors (HTTP 429)
 _MAX_RETRIES = 5
 _RETRY_BASE_DELAY = 10  # seconds; doubles on each retry
+
+# Reuse one Gemini client per process (avoids connection buildup over 1000s of calls).
+_gemini_client = None
 
 
 # ---------------------------------------------------------------------------
@@ -182,7 +189,7 @@ def _call_openrouter(model_id: str, prompt: str) -> str:
                 model=model_id,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=_TEMPERATURE,
-                max_tokens=4096,
+                max_tokens=2048,
                 extra_headers={"X-use-cache": "false"},  # disable OpenRouter response cache
             )
             return response.choices[0].message.content or ""
@@ -286,10 +293,9 @@ def _call_together(model_id: str, prompt: str) -> str:
 # Provider: Gemini
 # ---------------------------------------------------------------------------
 
-def _call_gemini(model_id: str, prompt: str) -> str:
-    """
-    Call Google Gemini via the google-genai SDK (replaces deprecated google-generativeai).
-    """
+def _get_gemini_client():
+    """Return a process-wide Gemini client (created once)."""
+    global _gemini_client
     try:
         from google import genai
         from google.genai import types as genai_types
@@ -304,10 +310,21 @@ def _call_gemini(model_id: str, prompt: str) -> str:
             "Then run: export GEMINI_API_KEY='your_key_here'"
         )
 
-    client = genai.Client(
-        api_key=api_key,
-        http_options=genai_types.HttpOptions(timeout=300_000),  # 5 minutes (ms)
-    )
+    if _gemini_client is None:
+        _gemini_client = genai.Client(
+            api_key=api_key,
+            http_options=genai_types.HttpOptions(timeout=180_000),  # 3 minutes (ms)
+        )
+    return _gemini_client
+
+
+def _call_gemini(model_id: str, prompt: str) -> str:
+    """
+    Call Google Gemini via the google-genai SDK (replaces deprecated google-generativeai).
+    """
+    from google.genai import types as genai_types
+
+    client = _get_gemini_client()
 
     delay = _RETRY_BASE_DELAY
     for attempt in range(1, _MAX_RETRIES + 1):
