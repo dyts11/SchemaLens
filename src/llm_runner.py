@@ -29,6 +29,7 @@ Usage:
 import os
 import re
 import time
+from typing import Optional
 
 # ---------------------------------------------------------------------------
 # Model registry
@@ -43,6 +44,9 @@ MODELS = {
     "gemini-3.5-flash": {
         "provider": "gemini",
         "model_id": "gemini-3.5-flash",
+        # thinking_budget: 0 = disable extended thinking (faster/cheaper SQL runs).
+        # Override with env GEMINI_THINKING_BUDGET (-1 = model default / automatic).
+        "thinking_budget": 0,
     },
     "gemini-2.5-pro": {
         "provider": "gemini",
@@ -121,7 +125,7 @@ def call_llm(model_name: str, prompt: str) -> str:
     elif provider == "together":
         raw = _call_together(config["model_id"], prompt)
     elif provider == "gemini":
-        raw = _call_gemini(config["model_id"], prompt)
+        raw = _call_gemini(config["model_id"], prompt, thinking_budget=config.get("thinking_budget"))
     else:
         raise NotImplementedError(f"Provider '{provider}' is not implemented.")
 
@@ -318,12 +322,44 @@ def _get_gemini_client():
     return _gemini_client
 
 
-def _call_gemini(model_id: str, prompt: str) -> str:
+def _gemini_thinking_budget(model_id: str, model_default: Optional[int]) -> Optional[int]:
+    """
+    Resolve thinking_budget for GenerateContentConfig.thinking_config.
+
+    google-genai ThinkingConfig: 0 = disabled, -1 = automatic (model default).
+  Env GEMINI_THINKING_BUDGET overrides the per-model registry default.
+    """
+    env_val = os.environ.get("GEMINI_THINKING_BUDGET")
+    if env_val is not None and env_val.strip() != "":
+        return int(env_val.strip())
+    return model_default
+
+
+def _gemini_generate_config(model_id: str, thinking_budget: Optional[int]):
+    from google.genai import types as genai_types
+
+    budget = _gemini_thinking_budget(model_id, thinking_budget)
+    kwargs = {
+        "temperature": _TEMPERATURE,
+        "candidate_count": 1,
+    }
+    if budget is not None:
+        kwargs["thinking_config"] = genai_types.ThinkingConfig(
+            thinking_budget=budget,
+            include_thoughts=False,
+        )
+    return genai_types.GenerateContentConfig(**kwargs)
+
+
+def _call_gemini(
+    model_id: str,
+    prompt: str,
+    *,
+    thinking_budget: Optional[int] = None,
+) -> str:
     """
     Call Google Gemini via the google-genai SDK (replaces deprecated google-generativeai).
     """
-    from google.genai import types as genai_types
-
     client = _get_gemini_client()
 
     delay = _RETRY_BASE_DELAY
@@ -332,10 +368,7 @@ def _call_gemini(model_id: str, prompt: str) -> str:
             response = client.models.generate_content(
                 model=model_id,
                 contents=prompt,
-                config=genai_types.GenerateContentConfig(
-                    temperature=_TEMPERATURE,
-                    candidate_count=1,
-                ),
+                config=_gemini_generate_config(model_id, thinking_budget),
             )
             return response.text or ""
 
