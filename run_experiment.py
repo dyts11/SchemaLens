@@ -89,6 +89,14 @@ MODEL_DELAY = {
     "qwen2.5-coder-32b":  2,
     "llama-3.1-8b":       1,
     "llama-3.3-70b":      1,
+    "qwen2.5-coder-0.5b-local": 0,
+    "qwen2.5-coder-1.5b-local": 0,
+    "qwen2.5-coder-3b-local":   0,
+    "qwen2.5-coder-7b-local":   0,
+    "qwen2.5-coder-14b-local":  0,
+    "qwen2.5-coder-32b-local":  0,
+    "phi-4-local":              0,
+    "olmo-2-13b-local":         0,
 }
 DELAY_BETWEEN_CALLS = 3  # fallback if model not in MODEL_DELAY
 

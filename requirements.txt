@@ -1,0 +1,24 @@
+# schema_effect - Python 3.9+
+#
+# Install (from schema_effect/):
+#   python3 -m venv .venv
+#   source .venv/bin/activate
+#   pip install -r requirements.txt
+#
+# API keys: copy .env.example to .env (GEMINI_API_KEY, TOGETHER_API_KEY,
+# OPENROUTER_API_KEY).
+
+# --- Experiment runners (run_experiment.py, src/rerun_db_experiment.py) ---
+python-dotenv>=1.0.0
+openai>=1.40.0
+google-genai>=1.0.0
+
+# --- Analysis / plotting (analysis/plot_*.py, bootstrap_accuracy_ci.py) ---
+matplotlib>=3.8.0
+numpy>=1.24.0
+pillow>=10.0.0
+
+# preprocess_data/*, src/evaluator.py, src/schema_builder.py use stdlib only
+# (sqlite3, csv, json, argparse).
+#
+# Local HuggingFace models on cluster (SLURM): also install requirements-local.txt

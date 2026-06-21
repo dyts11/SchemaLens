@@ -146,14 +146,14 @@ Wave 1 uses a single model (`gemini-2.5-flash`); “all models” collapses to t
 
 |  | **S1** | **S2** | **S3** |
 |--|--------|--------|--------|
-| **L1** | 0.3% | 32.7% | 33.8% |
-| **L2** | 0.3% | 38.8% | 39% |
-| **L3** | 4.5% | 38.8% | 40.8% |
-| **L4** | 9.1% | 39.3% | 40.6% |
-| **L5** | 16.9% | 38% | 40.3% |
-| **L6** | 15.6% | 39.8% | 39% |
+| **L1** | 0.3% ± 0.4% | 32.7% ± 4.5% | 33.8% ± 4.5% |
+| **L2** | 0.3% ± 0.4% | 38.8% ± 4.8% | 39.0% ± 4.8% |
+| **L3** | 4.5% ± 2.0% | 38.8% ± 4.8% | 40.8% ± 4.8% |
+| **L4** | 9.1% ± 2.8% | 39.3% ± 4.8% | 40.6% ± 4.8% |
+| **L5** | 16.9% ± 3.7% | 38.0% ± 4.8% | 40.3% ± 4.8% |
+| **L6** | 15.6% ± 3.5% | 39.8% ± 4.8% | 39.0% ± 4.8% |
 
-*Replace `—` with accuracy (%) and optional bootstrap margin, e.g. `42.0 ± 3.2`.*
+*Point ± half-width of 95% bootstrap CI (10,000 replicates, n=397 per cell). Regenerate: `python analysis/plot_main_heatmap.py`.*
 
 **Axes:** x = semantic level (S1–S3); y = structural level (L1–L6).  
 **Legend / colorbar:** execution accuracy (%), 0–100.  
@@ -195,11 +195,11 @@ Wave 1 uses a single model (`gemini-2.5-flash`); “all models” collapses to t
 
 | Difficulty | L1 | L2 | L3 | L4 | L5 | L6 |
 |------------|----|----|----|----|----|-----|
-| simple | — | — | — | — | — | — |
-| moderate | — | — | — | — | — | — |
-| challenging | — | — | — | — | — | — |
+| simple | 33.6 | 36.8 | 39.2 | 40.9 | 42.4 | 42.4 |
+| moderate | 19.6 | 24.7 | 26.4 | 27.4 | 29.2 | 29.0 |
+| challenging | 13.6 | 15.4 | 17.6 | 20.1 | 23.8 | 23.1 |
 
-*Aggregation per cell:* mean `correct` where `difficulty` matches and `structural_level = L*k*`, pooled over S1–S3 and all models.
+*Aggregation per cell:* mean `correct` where `difficulty` matches and `structural_level = L*k*`, pooled over S1–S3 (Gemini 2.5 Flash). Regenerate: `python analysis/plot_difficulty_lines.py --model gemini-2.5-flash`.
 
 **Axes:** x = structural level (L1–L6); y = execution accuracy (%).  
 **Legend:** simple / moderate / challenging (three lines).
@@ -212,19 +212,35 @@ Wave 1 uses a single model (`gemini-2.5-flash`); “all models” collapses to t
 
 | Difficulty | S1 | S2 | S3 |
 |------------|----|----|-----|
-| simple | — | — | — |
-| moderate | — | — | — |
-| challenging | — | — | — |
+| simple | 10.8 | 53.1 | 53.8 |
+| moderate | 7.0 | 35.5 | 35.6 |
+| challenging | 5.5 | 24.0 | 27.3 |
 
-*Aggregation per cell:* mean `correct` where `difficulty` matches and `semantic_level = S*k*`, pooled over L1–L6 and all models.
+*Aggregation per cell:* mean `correct` where `difficulty` matches and `semantic_level = S*k*`, pooled over L1–L6 (Gemini 2.5 Flash). Regenerate: `python analysis/plot_difficulty_lines.py --model gemini-2.5-flash`.
 
 **Axes:** x = semantic level (S1–S3); y = execution accuracy (%).  
 **Legend:** simple / moderate / challenging (three lines).
 
-### 6.6 Regenerate all figure templates
+### 6.6 Regenerate figures
+
+**§6.2 heatmap (filled from results + bootstrap CI):**
 
 ```bash
 cd schema_effect
+MPLBACKEND=Agg MPLCONFIGDIR=analysis/.mplconfig \
+  .venv/bin/python analysis/plot_main_heatmap.py --model gemini-2.5-flash
+```
+
+**§6.4–6.5 difficulty line charts (filled from results):**
+
+```bash
+MPLBACKEND=Agg MPLCONFIGDIR=analysis/.mplconfig \
+  .venv/bin/python analysis/plot_difficulty_lines.py --model gemini-2.5-flash
+```
+
+**Other §6 templates (placeholders until filled):**
+
+```bash
 MPLBACKEND=Agg MPLCONFIGDIR=analysis/.mplconfig \
   .venv/bin/python analysis/plot_experiment_templates.py
 ```
@@ -233,12 +249,10 @@ Outputs under `docs/figures/`:
 
 | File stem | Chart |
 |-----------|--------|
-| `main_experiment_gemini-2.5-flash_heatmap` | §6.2 |
+| `main_experiment_gemini-2.5-flash_heatmap` | §6.2 (`plot_main_heatmap.py`) |
 | `main_experiment_overall_marginal_tables` | §6.3 |
-| `main_experiment_difficulty_by_structure` | §6.4 |
-| `main_experiment_difficulty_by_semantics` | §6.5 |
-
-After runs, fill arrays in `analysis/plot_experiment_templates.py` (or extend the script to load `results/*.csv`) and re-run the command above.
+| `main_experiment_difficulty_by_structure` | §6.4 (`plot_difficulty_lines.py`) |
+| `main_experiment_difficulty_by_semantics` | §6.5 (`plot_difficulty_lines.py`) |
 
 ---
 

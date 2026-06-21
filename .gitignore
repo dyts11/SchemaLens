@@ -1,4 +1,5 @@
 .env
+slurm/config.env
 dev_20240627/
 results/
 dev.zip

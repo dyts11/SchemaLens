@@ -132,6 +132,8 @@ _SUPERHERO = OneNfSpec(
     ),
 )
 
+# Team_Attributes / Player_Attributes: join on team_api_id / player_api_id only.
+# Do not join on date — Match.date (fixture) ≠ attribute snapshot date.
 _EUROPEAN_FOOTBALL_2 = OneNfSpec(
     anchor_table="Match",
     join_steps=(
@@ -139,17 +141,9 @@ _EUROPEAN_FOOTBALL_2 = OneNfSpec(
         FOJ("League", ("a0", "league_id", "a2", "id")),
         FOJ("Team", ("a0", "home_team_api_id", "a3", "team_api_id"), prefix="team_home"),
         FOJ("Team", ("a0", "away_team_api_id", "a4", "team_api_id"), prefix="team_away"),
-        FOJ(
-            "Team_Attributes",
-            ("a0", "home_team_api_id", "a5", "team_api_id"),
-            ("a0", "date", "a5", "date"),
-        ),
+        FOJ("Team_Attributes", ("a0", "home_team_api_id", "a5", "team_api_id")),
         FOJ("Player", ("a0", "home_player_1", "a6", "player_api_id")),
-        FOJ(
-            "Player_Attributes",
-            ("a6", "player_api_id", "a7", "player_api_id"),
-            ("a0", "date", "a7", "date"),
-        ),
+        FOJ("Player_Attributes", ("a6", "player_api_id", "a7", "player_api_id")),
     ),
 )
 

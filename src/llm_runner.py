@@ -83,6 +83,47 @@ MODELS = {
         "provider": "openrouter",
         "model_id": "meta-llama/llama-3.1-8b-instruct",
     },
+    # --- Local HuggingFace (transformers; set LOCAL_MODELS_DIR on cluster) ---
+    "qwen2.5-coder-0.5b-local": {
+        "provider": "local",
+        "model_id": "Qwen/Qwen2.5-Coder-0.5B-Instruct",
+        "subdir": "Qwen2.5-Coder-0.5B-Instruct",
+    },
+    "qwen2.5-coder-1.5b-local": {
+        "provider": "local",
+        "model_id": "Qwen/Qwen2.5-Coder-1.5B-Instruct",
+        "subdir": "Qwen2.5-Coder-1.5B-Instruct",
+    },
+    "qwen2.5-coder-3b-local": {
+        "provider": "local",
+        "model_id": "Qwen/Qwen2.5-Coder-3B-Instruct",
+        "subdir": "Qwen2.5-Coder-3B-Instruct",
+    },
+    "qwen2.5-coder-7b-local": {
+        "provider": "local",
+        "model_id": "Qwen/Qwen2.5-Coder-7B-Instruct",
+        "subdir": "Qwen2.5-Coder-7B-Instruct",
+    },
+    "qwen2.5-coder-14b-local": {
+        "provider": "local",
+        "model_id": "Qwen/Qwen2.5-Coder-14B-Instruct",
+        "subdir": "Qwen2.5-Coder-14B-Instruct",
+    },
+    "qwen2.5-coder-32b-local": {
+        "provider": "local",
+        "model_id": "Qwen/Qwen2.5-Coder-32B-Instruct",
+        "subdir": "Qwen2.5-Coder-32B-Instruct",
+    },
+    "phi-4-local": {
+        "provider": "local",
+        "model_id": "microsoft/phi-4",
+        "subdir": "phi-4",
+    },
+    "olmo-2-13b-local": {
+        "provider": "local",
+        "model_id": "allenai/Olmo-2-1124-13B-Instruct",
+        "subdir": "Olmo-2-1124-13B-Instruct",
+    },
 }
 
 # Temperature fixed at 0 across all runs (reproducibility requirement)
@@ -94,6 +135,9 @@ _RETRY_BASE_DELAY = 10  # seconds; doubles on each retry
 
 # Reuse one Gemini client per process (avoids connection buildup over 1000s of calls).
 _gemini_client = None
+
+# One loaded (tokenizer, model) pair per local model name in this process.
+_local_models = {}
 
 
 # ---------------------------------------------------------------------------
@@ -126,6 +170,8 @@ def call_llm(model_name: str, prompt: str) -> str:
         raw = _call_together(config["model_id"], prompt)
     elif provider == "gemini":
         raw = _call_gemini(config["model_id"], prompt, thinking_budget=config.get("thinking_budget"))
+    elif provider == "local":
+        raw = _call_local(model_name, config, prompt)
     else:
         raise NotImplementedError(f"Provider '{provider}' is not implemented.")
 
@@ -389,3 +435,120 @@ def _call_gemini(
                 return ""
 
     return ""
+
+
+# ---------------------------------------------------------------------------
+# Provider: local HuggingFace (transformers)
+# ---------------------------------------------------------------------------
+
+def _resolve_local_model_path(config: dict) -> str:
+    """
+    Resolve on-disk path for a local model.
+
+    Priority:
+      1. LOCAL_MODELS_DIR / subdir  (cluster download layout)
+      2. LOCAL_MODELS_DIR / repo tail name
+      3. HF hub id (uses HF_HOME / default cache)
+    """
+    hf_repo = config["model_id"]
+    base = os.environ.get("LOCAL_MODELS_DIR") or os.environ.get("HF_MODELS_DIR")
+    if not base:
+        return hf_repo
+
+    candidates = []
+    subdir = config.get("subdir")
+    if subdir:
+        candidates.append(os.path.join(base, subdir))
+    candidates.append(os.path.join(base, hf_repo.replace("/", "--")))
+    candidates.append(os.path.join(base, hf_repo.split("/")[-1]))
+
+    for path in candidates:
+        if os.path.isfile(os.path.join(path, "config.json")):
+            return path
+    return candidates[0]
+
+
+def _get_local_model(model_name: str, config: dict):
+    if model_name in _local_models:
+        return _local_models[model_name]
+
+    try:
+        import torch
+        from transformers import AutoModelForCausalLM, AutoTokenizer
+    except ImportError as e:
+        raise ImportError(
+            "Local models require: pip install torch transformers accelerate"
+        ) from e
+
+    model_path = _resolve_local_model_path(config)
+    print(f"  [Local] Loading {model_name} from {model_path}", flush=True)
+
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_path,
+        trust_remote_code=True,
+    )
+    if torch.cuda.is_available():
+        dtype = torch.float16
+        if hasattr(torch.cuda, "is_bf16_supported") and torch.cuda.is_bf16_supported():
+            dtype = torch.bfloat16
+    else:
+        dtype = torch.float32
+    model = AutoModelForCausalLM.from_pretrained(
+        model_path,
+        torch_dtype=dtype,
+        device_map="auto" if torch.cuda.is_available() else None,
+        trust_remote_code=True,
+    )
+    if not torch.cuda.is_available():
+        model = model.to("cpu")
+    model.eval()
+
+    _local_models[model_name] = (tokenizer, model)
+    return _local_models[model_name]
+
+
+def _format_local_prompt(tokenizer, prompt: str) -> str:
+    if hasattr(tokenizer, "apply_chat_template"):
+        try:
+            messages = [{"role": "user", "content": prompt}]
+            return tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True,
+            )
+        except Exception:
+            pass
+    return prompt
+
+
+def _call_local(model_name: str, config: dict, prompt: str) -> str:
+    """Run greedy generation on a locally loaded HuggingFace model."""
+    try:
+        import torch
+    except ImportError as e:
+        raise ImportError(
+            "Local models require: pip install torch transformers accelerate"
+        ) from e
+
+    tokenizer, model = _get_local_model(model_name, config)
+    text = _format_local_prompt(tokenizer, prompt)
+    inputs = tokenizer(text, return_tensors="pt")
+    device = next(model.parameters()).device
+    inputs = {k: v.to(device) for k, v in inputs.items()}
+
+    pad_token_id = tokenizer.pad_token_id
+    if pad_token_id is None:
+        pad_token_id = tokenizer.eos_token_id
+
+    max_new_tokens = int(os.environ.get("LOCAL_MAX_NEW_TOKENS", "2048"))
+    with torch.no_grad():
+        output_ids = model.generate(
+            **inputs,
+            max_new_tokens=max_new_tokens,
+            do_sample=False,
+            temperature=_TEMPERATURE,
+            pad_token_id=pad_token_id,
+        )
+
+    new_tokens = output_ids[0, inputs["input_ids"].shape[1] :]
+    return tokenizer.decode(new_tokens, skip_special_tokens=True).strip()

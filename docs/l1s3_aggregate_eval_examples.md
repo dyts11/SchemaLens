@@ -1,6 +1,8 @@
 # L1S3 aggregate failures: evaluation vs generation errors
 
-Examples from `results/llama-3.3-70b-or__L1S3.csv` (`structural_level=1`, `semantic_level=3`, `question_type=aggregate`, `outcome=wrong_answer`).
+> **Combined doc:** Full L1/L2/L3 error analysis plus this section as **Part V** → [`gemini_S3_error_analysis_L1_L2_L3.md`](gemini_S3_error_analysis_L1_L2_L3.md).
+
+Examples from `results/llama-3.3-70b-or__L1S3.csv` (`structural_level=1`, `semantic_level=3`, `question_type=aggregate`, `outcome=wrong_answer`). The same evaluation asymmetry applies to **Gemini** `gemini-2.5-flash__L1S3.csv` (142 aggregate failures).
 
 **Setup:** Gold SQL runs on the **3NF** database; predicted SQL runs on **`{db_id}__1nf.sqlite`** (`one_nf_0`). Results are compared as **multisets** (order-independent row bags) in `evaluator.py`.
 

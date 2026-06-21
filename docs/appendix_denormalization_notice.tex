@@ -1,0 +1,306 @@
+% \input{appendix_denormalization_notice}
+% Requires in preamble:
+%   \usepackage[most]{tcolorbox}
+%   \tcbuselibrary{listings,breakable,skins}
+%   \usepackage{listings}
+%   \usepackage{booktabs}   % for summary table only
+%   \usepackage{enumitem}   % optional: compact lists (or remove [nosep] below)
+
+\lstdefinestyle{sqlappendix}{%
+  language=SQL,
+  basicstyle=\ttfamily\footnotesize,
+  breaklines=true,
+  breakindent=0pt,
+  breakautoindent=false,
+  columns=flexible,
+  keepspaces=true,
+  showstringspaces=false,
+  tabsize=2,
+  aboveskip=0pt,
+  belowskip=0pt,
+  xleftmargin=0pt,
+  framexleftmargin=0pt,
+  keywordstyle=\bfseries\color{blue!60!black},
+  commentstyle=\itshape\color{black!55},
+  stringstyle=\color{teal!60!black},
+  morekeywords={EXISTS, IN},%
+}
+
+\newtcblisting{sqlwrong}{%
+  listing only,
+  listing options={style=sqlappendix},
+  enhanced,
+  breakable,
+  colback=red!4,
+  colframe=red!40,
+  boxrule=0.4pt,
+  arc=2pt,
+  left=5pt,
+  right=5pt,
+  top=3pt,
+  bottom=3pt,
+  before skip=4pt,
+  after skip=5pt,
+  title={\sffamily\bfseries Wrong},
+  fonttitle=\small,
+  coltitle=black,
+  attach boxed title to top left={yshift=-1mm, xshift=2mm},
+  boxed title style={empty, size=minimal},%
+}
+
+\newtcblisting{sqlcorrect}{%
+  listing only,
+  listing options={style=sqlappendix},
+  enhanced,
+  breakable,
+  colback=green!4,
+  colframe=green!45!black,
+  boxrule=0.4pt,
+  arc=2pt,
+  left=5pt,
+  right=5pt,
+  top=3pt,
+  bottom=3pt,
+  before skip=4pt,
+  after skip=8pt,
+  title={\sffamily\bfseries Correct},
+  fonttitle=\small,
+  coltitle=black,
+  attach boxed title to top left={yshift=-1mm, xshift=2mm},
+  boxed title style={empty, size=minimal},%
+}
+
+\newtcblisting{sqlneutral}{%
+  listing only,
+  listing options={style=sqlappendix},
+  enhanced,
+  breakable,
+  colback=gray!8,
+  colframe=gray!45,
+  boxrule=0.4pt,
+  arc=2pt,
+  left=5pt,
+  right=5pt,
+  top=3pt,
+  bottom=3pt,
+  before skip=4pt,
+  after skip=8pt,%
+}
+
+\newcommand{\denormquestion}[1]{\par\smallskip\noindent\textit{Question:}~#1\par}
+\newcommand{\denormrule}{\par\smallskip\noindent\textbf{RULE:}\space}
+
+\subsection{Denormalization Notice}
+\label{app:denormalization_notice}
+
+\begin{tcolorbox}[
+  colback=gray!5,
+  colframe=gray!20,
+  arc=4pt,
+  boxrule=0.5pt,
+  breakable,
+  left=8pt,
+  right=8pt,
+  top=8pt,
+  bottom=8pt,
+  nobeforeafter,
+]
+{\bfseries Schema Denormalization Notice}\par\medskip
+
+The database schema provided is in a denormalized form.
+Tables have been constructed by joining multiple normalized entities together, which means a single logical record (e.g.\ one race result, one driver) may appear across multiple rows due to join redundancy.
+You must account for this when writing SQL to avoid returning inflated or incorrect results.
+
+The rules below tell you exactly how to handle this for each query type.
+
+\tcbline
+\paragraph{1.\ Retrieval Queries (SELECT without aggregation)}
+Retrieval queries return rows of values---names, IDs, descriptions, dates.
+
+\denormrule Always use \texttt{SELECT DISTINCT} when retrieving any column or combination of columns, unless the question explicitly asks for all occurrences including repetitions.
+
+\noindent\textbf{Examples:}
+
+\denormquestion{``List the names of all drivers who competed in race~5.''}
+\begin{sqlwrong}
+SELECT driver_name FROM results_flat WHERE race_id = 5
+\end{sqlwrong}
+\begin{sqlcorrect}
+SELECT DISTINCT driver_name FROM results_flat WHERE race_id = 5
+\end{sqlcorrect}
+
+\denormquestion{``What circuits have hosted a race?''}
+\begin{sqlwrong}
+SELECT circuit_name FROM results_flat
+\end{sqlwrong}
+\begin{sqlcorrect}
+SELECT DISTINCT circuit_name FROM results_flat
+\end{sqlcorrect}
+
+\noindent\textbf{When to \emph{not} use \texttt{DISTINCT} on retrieval:}
+\begin{itemize}
+  \item The question asks for all rows explicitly, e.g.\ ``list every lap time recorded''---repetition may be expected.
+  \item The question includes \texttt{ORDER BY} with \texttt{LIMIT} and you are retrieving a specific ranked row---\texttt{DISTINCT} may change ranking behaviour.
+\end{itemize}
+
+\tcbline
+\paragraph{2.\ COUNT Queries}
+COUNT queries count how many things exist.
+This is the most error-prone query type on denormalized schemas.
+You must identify what entity is being counted and apply \texttt{DISTINCT} to that entity's primary identifier.
+
+\denormrule Always use \texttt{COUNT(DISTINCT \textit{entity\_id})} rather than \texttt{COUNT(*)} or \texttt{COUNT(\textit{column})}, where \textit{entity\_id} is the primary key of the logical entity the question is asking about.
+
+\noindent\textbf{Examples:}
+
+\denormquestion{``How many drivers competed in race~5?''}
+\begin{sqlwrong}
+SELECT COUNT(*) FROM results_flat WHERE race_id = 5
+\end{sqlwrong}
+\begin{sqlwrong}
+SELECT COUNT(driver_id) FROM results_flat WHERE race_id = 5
+\end{sqlwrong}
+\begin{sqlcorrect}
+SELECT COUNT(DISTINCT driver_id) FROM results_flat WHERE race_id = 5
+\end{sqlcorrect}
+
+\denormquestion{``How many races has Hamilton participated in?''}
+\begin{sqlwrong}
+SELECT COUNT(*) FROM results_flat WHERE driver_name = 'Hamilton'
+\end{sqlwrong}
+\begin{sqlcorrect}
+SELECT COUNT(DISTINCT race_id) FROM results_flat
+  WHERE driver_name = 'Hamilton'
+\end{sqlcorrect}
+
+\denormquestion{``How many results were recorded with more than 5 points?''}
+\begin{sqlcorrect}
+SELECT COUNT(DISTINCT result_id) FROM results_flat WHERE points > 5
+\end{sqlcorrect}
+
+\noindent\textbf{Identifying which \textit{entity\_id} to use:}
+\begin{itemize}
+  \item If counting people/drivers/teams $\rightarrow$ \texttt{DISTINCT} on \texttt{driver\_id} or \texttt{team\_id}
+  \item If counting events/races/games $\rightarrow$ \texttt{DISTINCT} on \texttt{race\_id} or \texttt{event\_id}
+  \item If counting records/results $\rightarrow$ \texttt{DISTINCT} on \texttt{result\_id}
+  \item If counting laps $\rightarrow$ lap rows are the atomic unit; \texttt{COUNT(*)} may be appropriate if laps themselves are what is counted
+\end{itemize}
+
+\tcbline
+\paragraph{3.\ SUM and AVG Queries}
+\texttt{SUM} and \texttt{AVG} are the most dangerous query types on denormalized schemas.
+A simple \texttt{SUM(points)} will add up points once per row, but each logical result may appear many times (once per lap), inflating the total massively.
+\texttt{DISTINCT} cannot be applied directly inside \texttt{SUM} or \texttt{AVG}.
+
+\denormrule Always deduplicate using a subquery before applying \texttt{SUM} or \texttt{AVG}.
+The subquery should \texttt{SELECT DISTINCT} on the primary key of the entity whose attribute you are aggregating, along with the attribute column.
+
+\noindent\textbf{Template:}
+\begin{sqlneutral}
+SELECT SUM(col) / AVG(col)
+FROM (
+  SELECT DISTINCT entity_id, col
+  FROM table_name
+  WHERE condition
+)
+\end{sqlneutral}
+
+\noindent\textbf{Examples:}
+
+\denormquestion{``What is the total points scored by Hamilton?''}
+\begin{sqlwrong}
+SELECT SUM(points) FROM results_flat
+  WHERE driver_name = 'Hamilton'
+  -- Inflated: sums points once per lap row
+\end{sqlwrong}
+\begin{sqlcorrect}
+SELECT SUM(points) FROM (
+  SELECT DISTINCT result_id, points
+  FROM results_flat
+  WHERE driver_name = 'Hamilton'
+)
+\end{sqlcorrect}
+
+\denormquestion{``What is the average points per race in the 2020 season?''}
+\begin{sqlcorrect}
+SELECT AVG(points) FROM (
+  SELECT DISTINCT result_id, points
+  FROM results_flat
+  WHERE race_year = 2020
+)
+\end{sqlcorrect}
+
+\tcbline
+\paragraph{4.\ GROUP BY Queries}
+\texttt{GROUP BY} queries aggregate within groups---e.g.\ total points per driver, number of races per year.
+On denormalized schemas, \texttt{GROUP BY} alone does not deduplicate; it groups all rows including duplicates.
+
+\denormrule When using \texttt{GROUP BY}, either:
+\begin{enumerate}
+  \item Apply \texttt{COUNT(DISTINCT \textit{entity\_id})} inside the aggregation, or
+  \item Deduplicate with a subquery before grouping
+\end{enumerate}
+
+\noindent\textbf{Examples:}
+
+\denormquestion{``How many races did each driver compete in?''}
+\begin{sqlwrong}
+SELECT driver_name, COUNT(*) FROM results_flat GROUP BY driver_name
+\end{sqlwrong}
+\begin{sqlcorrect}
+SELECT driver_name, COUNT(DISTINCT race_id)
+FROM results_flat
+GROUP BY driver_name
+\end{sqlcorrect}
+
+\denormquestion{``What is the total points per driver in the 2020 season?''}
+\begin{sqlwrong}
+SELECT driver_name, SUM(points) FROM results_flat
+  WHERE race_year = 2020
+GROUP BY driver_name
+\end{sqlwrong}
+\begin{sqlcorrect}
+SELECT driver_name, SUM(points) FROM (
+  SELECT DISTINCT result_id, driver_name, points
+  FROM results_flat
+  WHERE race_year = 2020
+) GROUP BY driver_name
+\end{sqlcorrect}
+
+\tcbline
+\paragraph{5.\ MIN and MAX Queries}
+\texttt{MIN} and \texttt{MAX} are safe on denormalized schemas because taking the minimum or maximum of a repeated value returns the same result regardless of how many times the value appears.
+
+\denormrule No special handling needed for \texttt{MIN} and \texttt{MAX}. Use them normally.
+
+\denormquestion{``What is the fastest lap time recorded by Hamilton?''}
+\begin{sqlcorrect}
+SELECT MIN(laptime) FROM laptimes_flat
+  WHERE driver_name = 'Hamilton'
+  -- Safe: MIN of repeated values is unaffected by duplicates
+\end{sqlcorrect}
+
+\tcbline
+\paragraph{6.\ EXISTS and IN Subqueries}
+\texttt{EXISTS} and \texttt{IN} check for the presence of a value, not its count.
+Duplicates do not affect correctness here.
+
+\denormrule No special handling needed for \texttt{EXISTS} or \texttt{IN} subqueries.
+
+\tcbline
+\paragraph{Summary Reference}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}ll@{}}
+  \toprule
+  \textbf{Query type} & \textbf{Rule} \\
+  \midrule
+  \texttt{SELECT}     & Always \texttt{DISTINCT} unless repetition is intended \\
+  \texttt{COUNT}      & Always \texttt{COUNT(DISTINCT entity\_id)} \\
+  \texttt{SUM}/\texttt{AVG} & Deduplicate in subquery first, then aggregate \\
+  \texttt{GROUP BY}   & Use \texttt{COUNT(DISTINCT ...)} or subquery deduplication \\
+  \texttt{MIN}/\texttt{MAX} & Safe---no special handling needed \\
+  \texttt{EXISTS}/\texttt{IN} & Safe---no special handling needed \\
+  \bottomrule
+\end{tabular}
+
+\end{tcolorbox}

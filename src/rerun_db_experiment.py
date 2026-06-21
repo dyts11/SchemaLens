@@ -1,32 +1,30 @@
 #!/usr/bin/env python3
 """
-Purge and rerun experiment results for one database.
+Rerun experiment results for one database after rebuilding its schema SQLite.
 
-Use after rebuilding a materialised schema (e.g. 1NF SQLite) for a single db_id.
-By default only L1 conditions are rerun (predicted SQL uses `{db_id}__1nf.sqlite`).
+Loads every question for ``db_id`` from the arcwise question set, then runs
+the requested structural x semantic levels for each model. Results are written
+to separate CSV files under ``results/rerun/`` - the main ``results/`` CSVs
+are never read or modified.
 
 Usage (from schema_effect/):
 
-    # Preview deletions for european_football_2 L1 results
-    python -m src.rerun_db_experiment european_football_2 --dry-run
-
-    # Delete stale rows and rerun L1 x S1-S3 for all models with existing CSVs
+    # Edit MODELS below, then:
     python -m src.rerun_db_experiment european_football_2
 
-    # Limit models or structural levels
+    # Or override models on the command line:
     python -m src.rerun_db_experiment european_football_2 \\
         --models qwen2.5-coder-14b-local gemini-2.5-flash \\
-        --structural-levels 1
+        --dry-run
 """
 
 from __future__ import annotations
 
 import argparse
-import csv
 import sys
 import time
 from pathlib import Path
-from typing import Iterable, List, Optional, Sequence, Set, Tuple
+from typing import Iterable, List, Optional, Sequence, Tuple
 
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
@@ -39,7 +37,6 @@ except ImportError:
     pass
 
 from run_experiment import (  # noqa: E402
-    CSV_COLUMNS,
     DATA_DIR,
     DELAY_BETWEEN_CALLS,
     MODEL_DELAY,
@@ -48,52 +45,79 @@ from run_experiment import (  # noqa: E402
     build_l1_col_rename_map,
     build_l2_col_rename_map,
     load_experiment_questions,
-    results_file,
 )
 from src.evaluator import evaluate
 from src.llm_runner import call_llm
 from src.prompt_builder import build_prompt
 from src.schema_builder import L1_DB_IDS, L2_DB_IDS, SchemaBuilder
 
+# ---------------------------------------------------------------------------
+# Configuration - edit this section to change what gets run
+# ---------------------------------------------------------------------------
+
+MODELS = [
+    "qwen2.5-coder-0.5b-local",
+    "qwen2.5-coder-1.5b-local",
+    "qwen2.5-coder-3b-local",
+    "qwen2.5-coder-7b-local",
+    "qwen2.5-coder-14b-local",
+    "qwen2.5-coder-32b-local",
+    "phi-4-local",
+    "olmo-2-13b-local",
+]
+
+# L1 predicted SQL runs on ``{db_id}__1nf.sqlite``.
+DEFAULT_STRUCTURAL_LEVELS = (1,)
+DEFAULT_SEMANTIC_LEVELS = (1, 2, 3)
+
+DEFAULT_RESULTS_DIR = "results/rerun"
+
+
+def rerun_results_path(
+    results_dir: Path,
+    db_id: str,
+    model: str,
+    struct_level: int,
+    sem_level: int,
+) -> Path:
+    """Path for a per-db rerun CSV (separate from main experiment results)."""
+    safe_model = model.replace("/", "-")
+    return results_dir / f"{db_id}__{safe_model}__L{struct_level}S{sem_level}.csv"
+
 
 def _parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(
-        description="Delete results for one db_id and rerun those questions."
+        description="Rerun experiment results for all questions of one db_id."
     )
     p.add_argument(
         "db_id",
         help="BIRD database id (e.g. european_football_2)",
     )
     p.add_argument(
+        "--models",
+        nargs="+",
+        default=None,
+        help="Override MODELS in this file (one or more model ids)",
+    )
+    p.add_argument(
         "--results-dir",
-        default="results",
-        help="Directory with {model}__L{l}S{s}.csv files (default: results)",
+        default=DEFAULT_RESULTS_DIR,
+        help=f"Output directory for rerun CSVs (default: {DEFAULT_RESULTS_DIR})",
     )
     p.add_argument(
         "--structural-levels",
-        default="1",
-        help="Comma-separated structural levels to purge/rerun (default: 1)",
+        default=",".join(str(x) for x in DEFAULT_STRUCTURAL_LEVELS),
+        help="Comma-separated structural levels (default: 1)",
     )
     p.add_argument(
         "--semantic-levels",
-        default="1,2,3",
-        help="Comma-separated semantic levels to purge/rerun (default: 1,2,3)",
-    )
-    p.add_argument(
-        "--models",
-        nargs="*",
-        default=None,
-        help="Models to rerun (default: every model with a matching results CSV)",
+        default=",".join(str(x) for x in DEFAULT_SEMANTIC_LEVELS),
+        help="Comma-separated semantic levels (default: 1,2,3)",
     )
     p.add_argument(
         "--dry-run",
         action="store_true",
-        help="Print planned deletions/reruns without writing or calling LLMs",
-    )
-    p.add_argument(
-        "--delete-only",
-        action="store_true",
-        help="Remove stale rows only; do not rerun",
+        help="Print planned runs without calling LLMs or writing CSVs",
     )
     return p.parse_args(argv)
 
@@ -117,57 +141,12 @@ def _conditions(
     return [(sl, sem) for sl in structural_levels for sem in semantic_levels]
 
 
-def _discover_models(results_dir: Path, conditions: List[Tuple[int, int]]) -> List[str]:
-    wanted = {f"__L{sl}S{sem}.csv" for sl, sem in conditions}
-    models: Set[str] = set()
-    for path in results_dir.glob("*.csv"):
-        name = path.name
-        for suffix in wanted:
-            if name.endswith(suffix):
-                model = name[: -len(suffix)]
-                if model:
-                    models.add(model)
-                break
-    return sorted(models)
-
-
-def _target_csv_paths(
-    results_dir: Path,
-    models: Sequence[str],
-    conditions: List[Tuple[int, int]],
-) -> List[Path]:
-    paths: List[Path] = []
-    for model in models:
-        for sl, sem in conditions:
-            paths.append(results_dir / Path(results_file(model, sl, sem)).name)
-    return paths
-
-
-def purge_db_rows(
-    csv_path: Path,
-    db_id: str,
-    *,
-    dry_run: bool,
-) -> Tuple[int, int]:
-    """Remove rows with matching db_id. Returns (rows_before, rows_removed)."""
-    if not csv_path.is_file():
-        return 0, 0
-
-    with csv_path.open(encoding="utf-8", newline="") as f:
-        reader = csv.DictReader(f)
-        if reader.fieldnames is None:
-            return 0, 0
-        rows = list(reader)
-
-    before = len(rows)
-    kept = [r for r in rows if r.get("db_id") != db_id]
-    removed = before - len(kept)
-    if removed and not dry_run:
-        with csv_path.open("w", encoding="utf-8", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=CSV_COLUMNS)
-            writer.writeheader()
-            writer.writerows(kept)
-    return before, removed
+def load_questions_for_db(db_id: str) -> List[dict]:
+    """All arcwise questions for ``db_id``, in arcwise file order."""
+    questions = [q for q in load_experiment_questions() if q["db_id"] == db_id]
+    if not questions:
+        raise SystemExit(f"No questions found for db_id={db_id!r} in arcwise_plat_sql.json")
+    return questions
 
 
 def _validate_db_prerequisites(db_id: str, conditions: List[Tuple[int, int]]) -> None:
@@ -200,7 +179,7 @@ def _validate_db_prerequisites(db_id: str, conditions: List[Tuple[int, int]]) ->
         )
 
 
-def rerun(
+def run_experiments(
     db_id: str,
     *,
     results_dir: Path,
@@ -227,14 +206,18 @@ def rerun(
     done = 0
 
     print(
-        f"\nRerunning {len(questions)} questions x {len(conditions)} conditions "
+        f"\nRunning {len(questions)} questions x {len(conditions)} conditions "
         f"x {len(models)} models = {total} LLM calls"
     )
+
+    results_dir.mkdir(parents=True, exist_ok=True)
 
     for struct_level, sem_level in conditions:
         condition_label = f"L{struct_level}S{sem_level}"
         for model in models:
-            csv_path = results_dir / Path(results_file(model, struct_level, sem_level)).name
+            csv_path = rerun_results_path(
+                results_dir, db_id, model, struct_level, sem_level
+            )
             print(f"\n{'=' * 60}")
             print(f"  {condition_label} | {model}")
             print(f"  Output: {csv_path}")
@@ -243,6 +226,9 @@ def rerun(
                 print(f"  [dry-run] would run {len(questions)} questions")
                 done += len(questions)
                 continue
+
+            if csv_path.is_file():
+                csv_path.unlink()
 
             pred_conn = None
             try:
@@ -330,46 +316,29 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
     sem_levels = _parse_int_list(args.semantic_levels, "--semantic-levels")
     conditions = _conditions(struct_levels, sem_levels)
 
-    all_questions = load_experiment_questions()
-    questions = [q for q in all_questions if q["db_id"] == db_id]
-    if not questions:
-        raise SystemExit(f"No questions found for db_id={db_id!r} in arcwise_plat_sql.json")
+    questions = load_questions_for_db(db_id)
+    question_ids = {int(q["question_id"]) for q in questions}
 
-    models = args.models or _discover_models(results_dir, conditions)
+    models = args.models if args.models is not None else MODELS
     if not models:
         raise SystemExit(
-            f"No results CSVs found under {results_dir} for conditions {conditions}"
+            "No models to run: set MODELS in src/rerun_db_experiment.py "
+            "or pass --models on the command line."
         )
 
-    csv_paths = _target_csv_paths(results_dir, models, conditions)
-
     print(f"Database     : {db_id}")
-    print(f"Questions    : {len(questions)}")
+    print(f"Questions    : {len(questions)} "
+          f"(ids {min(question_ids)}-{max(question_ids)})")
     print(f"Conditions   : {', '.join(f'L{sl}S{sem}' for sl, sem in conditions)}")
     print(f"Models       : {', '.join(models)}")
     print(f"Results dir  : {results_dir}")
     if args.dry_run:
         print("Mode         : dry-run")
-    if args.delete_only:
-        print("Mode         : delete-only")
-
-    total_removed = 0
-    print("\nPurging stale rows:")
-    for path in csv_paths:
-        before, removed = purge_db_rows(path, db_id, dry_run=args.dry_run)
-        if removed or path.is_file():
-            action = "would remove" if args.dry_run else "removed"
-            print(f"  {path.name}: {action} {removed} / {before} rows")
-        total_removed += removed
-    print(f"Total rows {'to remove' if args.dry_run else 'removed'}: {total_removed}")
-
-    if args.delete_only:
-        return
 
     if not args.dry_run:
         _validate_db_prerequisites(db_id, conditions)
 
-    rerun(
+    run_experiments(
         db_id,
         results_dir=results_dir,
         conditions=conditions,
