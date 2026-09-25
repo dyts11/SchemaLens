@@ -4,4 +4,10 @@ dev_20240627/
 results/
 dev.zip
 data_minidev.zip
-.cursor/
+.claude/
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+analysis/.mplconfig/
+logs/
