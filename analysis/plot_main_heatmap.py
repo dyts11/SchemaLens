@@ -42,6 +42,15 @@ STRUCT_LABELS = [
 ]
 SEM_LABELS = ["S1\nanonymous", "S2\nabbreviated", "S3\ndescriptive"]
 
+MODEL_DISPLAY = {
+    "gemini-2.5-flash": "Gemini 2.5 Flash",
+    "qwen2.5-coder-14b-local": "Qwen2.5-Coder-14B",
+}
+
+
+def _display_model(model: str) -> str:
+    return MODEL_DISPLAY.get(model, model.replace("-", " ").title())
+
 
 def _apply_pub_style() -> None:
     mpl.rcParams.update(
@@ -131,6 +140,8 @@ def plot_heatmap(
     model: str,
     out_stem: Path,
     vmax: float = 45.0,
+    n_per_cell: int = 397,
+    dataset_label: str = "",
 ) -> None:
     """Publication heatmap: color = accuracy; cell text = point ± CI half-width."""
     _apply_pub_style()
@@ -163,9 +174,10 @@ def plot_heatmap(
     ax.set_yticklabels(STRUCT_LABELS, fontsize=6.5)
     ax.set_ylabel("Structural level", fontsize=7.5, labelpad=4)
 
-    model_title = model.replace("-", " ").replace("gemini", "Gemini").title()
+    model_title = _display_model(model)
+    ds = f"{dataset_label}, " if dataset_label else ""
     ax.set_title(
-        f"Execution accuracy by schema condition\n({model_title}, n=397 per cell)",
+        f"Execution accuracy by schema condition\n({model_title}, {ds}n={n_per_cell} per cell)",
         fontsize=8,
         fontweight="bold",
         pad=8,
@@ -208,20 +220,31 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--results-dir", type=Path, default=_ROOT / "results")
     parser.add_argument("--n-bootstrap", type=int, default=10000)
     parser.add_argument("--vmax", type=float, default=45.0, help="Color scale max (%% accuracy)")
+    parser.add_argument("--dataset-label", default="", help="e.g. 'Spider (car_1 + tvshow)'")
+    parser.add_argument("--out-stem", type=Path, default=None, help="Output path without extension")
     parser.add_argument("--no-print-table", action="store_true")
     args = parser.parse_args(argv)
 
     os.environ.setdefault("MPLCONFIGDIR", str(Path(__file__).resolve().parent / ".mplconfig"))
 
-    acc, margin, _ = load_model_grid(
+    acc, margin, summaries = load_model_grid(
         args.results_dir,
         args.model,
         n_bootstrap=args.n_bootstrap,
     )
+    n_per_cell = summaries[0][3] if summaries else 397
     safe = args.model.replace("/", "-")
-    out_stem = FIG_DIR / f"main_experiment_{safe}_heatmap"
+    out_stem = args.out_stem or (FIG_DIR / f"main_experiment_{safe}_heatmap")
 
-    plot_heatmap(acc, margin, model=args.model, out_stem=out_stem, vmax=args.vmax)
+    plot_heatmap(
+        acc,
+        margin,
+        model=args.model,
+        out_stem=out_stem,
+        vmax=args.vmax,
+        n_per_cell=n_per_cell,
+        dataset_label=args.dataset_label,
+    )
 
     if not args.no_print_table:
         print_markdown_table(acc, margin)
