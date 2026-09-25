@@ -343,6 +343,85 @@ _EUROPEAN_FOOTBALL_2 = TwoNfDbSpec(
     ),
 )
 
+# ---------------------------------------------------------------------------
+# car_1 (Spider) — leaf fact cluster + model/geography cluster on car_names
+# ---------------------------------------------------------------------------
+_CAR_1 = TwoNfDbSpec(
+    clusters=(
+        TwoNfClusterSpec(
+            "two_nf_cars_data",
+            "cars_data",
+            (("car_names", (("a0", "Id", "a1", "MakeId"),)),),
+        ),
+        TwoNfClusterSpec(
+            "two_nf_car_names",
+            "car_names",
+            (
+                ("model_list", (("a0", "Model", "a1", "Model"),)),
+                ("car_makers", (("a1", "Maker", "a2", "Id"),)),
+                ("countries", (("a2", "Country", "a3", "CountryId"),)),
+                ("continents", (("a3", "Continent", "a4", "ContId"),)),
+            ),
+        ),
+    ),
+)
+
+# ---------------------------------------------------------------------------
+# tvshow (Spider) — sibling facts: series and cartoon each join channel (no 1NF cartesian)
+# ---------------------------------------------------------------------------
+_TVSHOW = TwoNfDbSpec(
+    clusters=(
+        TwoNfClusterSpec(
+            "two_nf_tv_series",
+            "TV_series",
+            (("TV_Channel", (("a0", "Channel", "a1", "id"),)),),
+        ),
+        TwoNfClusterSpec(
+            "two_nf_cartoon",
+            "Cartoon",
+            (("TV_Channel", (("a0", "Channel", "a1", "id"),)),),
+        ),
+    ),
+)
+
+# ---------------------------------------------------------------------------
+# wamex (Acuity held-out) — report hub (+ 1:1 abstracts); sibling facts each own cluster,
+# abstracts keyed on the hub alias so hub-only rows keep their abstract
+# ---------------------------------------------------------------------------
+_WAMEX = TwoNfDbSpec(
+    clusters=(
+        TwoNfClusterSpec(
+            "two_nf_reports",
+            "wamex_reports",
+            (("abstracts", (("a0", "anumber", "a1", "anumber"),)),),
+        ),
+        TwoNfClusterSpec(
+            "two_nf_storages",
+            "storages",
+            (
+                ("wamex_reports", (("a0", "anumber", "a1", "anumber"),)),
+                ("abstracts", (("a1", "anumber", "a2", "anumber"),)),
+            ),
+        ),
+        TwoNfClusterSpec(
+            "two_nf_drilling",
+            "drilling_summaries",
+            (
+                ("wamex_reports", (("a0", "anumber", "a1", "anumber"),)),
+                ("abstracts", (("a1", "anumber", "a2", "anumber"),)),
+            ),
+        ),
+        TwoNfClusterSpec(
+            "two_nf_geochem",
+            "geo_chemistry",
+            (
+                ("wamex_reports", (("a0", "anumber", "a1", "anumber"),)),
+                ("abstracts", (("a1", "anumber", "a2", "anumber"),)),
+            ),
+        ),
+    ),
+)
+
 
 SPECS: dict[str, TwoNfDbSpec] = {
     "formula_1": _FORMULA_1,
@@ -354,4 +433,7 @@ SPECS: dict[str, TwoNfDbSpec] = {
     "student_club": _STUDENT_CLUB,
     "thrombosis_prediction": _THROMBOSIS_PREDICTION,
     "toxicology": _TOXICOLOGY,
+    "car_1": _CAR_1,
+    "tvshow": _TVSHOW,
+    "wamex": _WAMEX,
 }

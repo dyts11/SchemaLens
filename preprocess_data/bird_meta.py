@@ -7,11 +7,19 @@ from pathlib import Path
 from typing import List
 
 
-def load_dev_entry(db_id: str, data_dir: Path) -> dict:
-    tables_path = data_dir / "dev_tables.json"
-    with open(tables_path, encoding="utf-8") as f:
+def load_dev_entry(
+    db_id: str,
+    data_dir: Path,
+    *,
+    tables_path: Path | None = None,
+) -> dict:
+    path = tables_path if tables_path is not None else data_dir / "dev_tables.json"
+    with open(path, encoding="utf-8") as f:
         all_entries = json.load(f)
-    return next(t for t in all_entries if t["db_id"] == db_id)
+    try:
+        return next(t for t in all_entries if t["db_id"] == db_id)
+    except StopIteration as exc:
+        raise KeyError(f"db_id={db_id!r} not found in {path}") from exc
 
 
 def tables_cols(entry: dict) -> dict[str, List[dict]]:

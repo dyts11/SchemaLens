@@ -52,6 +52,7 @@ def build_plan(
     semantic_level: int = 3,
     *,
     source_prefix: str = "main",
+    tables_path: Union[str, Path, None] = None,
 ) -> TwoNfPlan:
     if db_id not in SPECS:
         supported = ", ".join(sorted(SPECS))
@@ -60,7 +61,8 @@ def build_plan(
         raise ValueError(f"semantic_level must be 1–4, got {semantic_level}")
 
     spec: TwoNfDbSpec = SPECS[db_id]
-    entry = load_dev_entry(db_id, Path(data_dir))
+    tp = Path(tables_path) if tables_path else None
+    entry = load_dev_entry(db_id, Path(data_dir), tables_path=tp)
     cols_by_table = tables_cols(entry)
 
     clusters: List[ClusterMaterialization] = []
@@ -91,8 +93,10 @@ def build_plan(
     )
 
 
-def _anchor_pk_labels(db_id: str, data_dir: Path) -> dict[str, str]:
-    entry = load_dev_entry(db_id, data_dir)
+def _anchor_pk_labels(
+    db_id: str, data_dir: Path, *, tables_path: Path | None = None
+) -> dict[str, str]:
+    entry = load_dev_entry(db_id, data_dir, tables_path=tables_path)
     col_lookup = {}
     for idx, (ti, cn) in enumerate(entry["column_names_original"]):
         if ti == -1:
@@ -109,8 +113,14 @@ def _anchor_pk_labels(db_id: str, data_dir: Path) -> dict[str, str]:
     return by_table
 
 
-def describe_plan(plan: TwoNfPlan, data_dir: Union[str, Path] = "dev_20240627") -> str:
-    pks = _anchor_pk_labels(plan.db_id, Path(data_dir))
+def describe_plan(
+    plan: TwoNfPlan,
+    data_dir: Union[str, Path] = "dev_20240627",
+    *,
+    tables_path: Union[str, Path, None] = None,
+) -> str:
+    tp = Path(tables_path) if tables_path else None
+    pks = _anchor_pk_labels(plan.db_id, Path(data_dir), tables_path=tp)
     spec = SPECS[plan.db_id]
     lines = [
         f"db_id={plan.db_id!r}  semantic_level=S{plan.semantic_level}",
@@ -143,6 +153,7 @@ def materialize_sqlite(
     semantic_level: int = 3,
     *,
     attach_alias: str = "orig",
+    tables_path: Union[str, Path, None] = None,
 ) -> Path:
     """
     Create ``output_sqlite`` with all wide 2NF clusters.
@@ -158,7 +169,10 @@ def materialize_sqlite(
     if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", attach_alias):
         raise ValueError(f"attach_alias must be a simple SQL identifier, got {attach_alias!r}")
 
-    plan = build_plan(db_id, data_dir, semantic_level, source_prefix=attach_alias)
+    tp = Path(tables_path) if tables_path else None
+    plan = build_plan(
+        db_id, data_dir, semantic_level, source_prefix=attach_alias, tables_path=tp
+    )
     spec = SPECS[db_id]
 
     probe = sqlite3.connect(str(source_sqlite))

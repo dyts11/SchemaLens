@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 """
-Materialise a 1NF wide SQLite table from a BIRD source database.
+Materialise a 1NF wide SQLite table from a BIRD or Spider source database.
 
 Usage (from schema_effect/):
 
+    # BIRD (default)
     python3 -m preprocess_data.to_1nf.build_sqlite --db formula_1
-    python3 -m preprocess_data.to_1nf.build_sqlite --db formula_1 --sem 3 -o /tmp/formula_1__1nf.sqlite
+
+    # Spider dev databases
+    python3 -m preprocess_data.to_1nf.build_sqlite --db car_1 \\
+        --spider-dir dev_20240627/spider_data
 
 Default output:
-    {data_dir}/dev_databases/{db_id}/{db_id}__1nf.sqlite
-    (physical S3 column names; S1/S2 use TEMP VIEW renaming at eval time, like L3)
+    BIRD  : {data_dir}/dev_databases/{db_id}/{db_id}__1nf.sqlite
+    Spider: {spider_dir}/database/{db_id}/{db_id}__1nf.sqlite
 """
 
 from __future__ import annotations
@@ -22,20 +26,18 @@ _ROOT = Path(__file__).resolve().parents[2]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
+from preprocess_data.data_layout import add_materialize_path_args, resolve_materialize_paths
 from preprocess_data.to_1nf.convert import materialize_sqlite
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Materialise 1NF wide table into a new SQLite file.")
+    p = argparse.ArgumentParser(
+        description="Materialise 1NF wide table into a new SQLite file (BIRD or Spider)."
+    )
     p.add_argument(
         "--db",
         required=True,
-        help="BIRD dev db_id (see preprocess_data.to_1nf.specs.SPECS)",
-    )
-    p.add_argument(
-        "--data-dir",
-        default="dev_20240627",
-        help="Root with dev_tables.json and dev_databases/ (default: dev_20240627)",
+        help="db_id (see preprocess_data.to_1nf.specs.SPECS)",
     )
     p.add_argument(
         "--sem",
@@ -44,27 +46,34 @@ def main() -> None:
         choices=(1, 2, 3, 4),
         help="Semantic level for column aliases (default: 3)",
     )
-    p.add_argument(
-        "-o",
-        "--output",
-        default=None,
-        help="Output .sqlite path (default: dev_databases/{db}/{db}__1nf.sqlite)",
-    )
+    add_materialize_path_args(p)
     args = p.parse_args()
 
-    data_dir = Path(args.data_dir)
-    source = data_dir / "dev_databases" / args.db / f"{args.db}.sqlite"
-    if args.output:
-        out = Path(args.output)
-    else:
-        out = data_dir / "dev_databases" / args.db / f"{args.db}__1nf.sqlite"
+    paths = resolve_materialize_paths(
+        args.db,
+        data_dir=Path(args.data_dir),
+        variant_suffix="__1nf",
+        spider_dir=Path(args.spider_dir) if args.spider_dir else None,
+        database_dir=Path(args.database_dir) if args.database_dir else None,
+        tables_json=Path(args.tables_json) if args.tables_json else None,
+        output=Path(args.output) if args.output else None,
+    )
 
-    print(f"Source : {source.resolve()}")
-    print(f"Output : {out.resolve()}")
+    print(f"Layout : {paths.layout}")
+    print(f"Tables : {paths.tables_json.resolve()}")
+    print(f"Source : {paths.source_sqlite.resolve()}")
+    print(f"Output : {paths.output_sqlite.resolve()}")
     print(f"db_id={args.db!r}  semantic_level={args.sem}")
     print("Building…")
 
-    materialize_sqlite(args.db, data_dir, source, out, semantic_level=args.sem)
+    materialize_sqlite(
+        args.db,
+        Path(args.data_dir),
+        paths.source_sqlite,
+        paths.output_sqlite,
+        semantic_level=args.sem,
+        tables_path=paths.tables_json,
+    )
     print("Done.")
 
 

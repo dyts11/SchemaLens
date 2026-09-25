@@ -238,11 +238,14 @@ def build_plan(
     semantic_level: int = 3,
     *,
     table_name: str = "one_nf_0",
+    tables_path: Union[str, Path, None] = None,
 ) -> OneNfPlan:
     if db_id not in SPECS:
         supported = ", ".join(sorted(SPECS))
         raise ValueError(f"No 1NF join spec for db_id={db_id!r}. Supported: {supported}")
-    entry = load_dev_entry(db_id, Path(data_dir))
+    entry = load_dev_entry(
+        db_id, Path(data_dir), tables_path=Path(tables_path) if tables_path else None
+    )
     select_sql, display_cols = _build_select_sql(
         db_id,
         SPECS[db_id],
@@ -268,6 +271,7 @@ def materialize_sqlite(
     *,
     attach_alias: str = "orig",
     table_name: str = "one_nf_0",
+    tables_path: Union[str, Path, None] = None,
 ) -> Path:
     """
     Create a new SQLite file with one materialised 1NF wide table.
@@ -283,7 +287,8 @@ def materialize_sqlite(
     if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", attach_alias):
         raise ValueError(f"attach_alias must be a simple SQL identifier, got {attach_alias!r}")
 
-    entry = load_dev_entry(db_id, data_dir)
+    tp = Path(tables_path) if tables_path else None
+    entry = load_dev_entry(db_id, data_dir, tables_path=tp)
     select_sql, _ = _build_select_sql(
         db_id,
         SPECS[db_id],

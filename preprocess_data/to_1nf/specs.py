@@ -147,7 +147,10 @@ _EUROPEAN_FOOTBALL_2 = OneNfSpec(
     ),
 )
 
-# member hub; expense bridges to budget / event; attendance on member
+# member hub; expense bridges to budget; event reached via attendance (not via
+# budget — budget's event and a member's attended event are different
+# relationships, and routing attendance's match through budget's event
+# orphaned every attendance row for members with zero expense rows)
 _STUDENT_CLUB = OneNfSpec(
     anchor_table="member",
     join_steps=(
@@ -155,12 +158,8 @@ _STUDENT_CLUB = OneNfSpec(
         FOJ("expense", ("a0", "member_id", "a2", "link_to_member")),
         FOJ("major", ("a0", "link_to_major", "a3", "major_id")),
         FOJ("budget", ("a2", "link_to_budget", "a4", "budget_id")),
-        FOJ("event", ("a4", "link_to_event", "a5", "event_id")),
-        FOJ(
-            "attendance",
-            ("a0", "member_id", "a6", "link_to_member"),
-            ("a5", "event_id", "a6", "link_to_event"),
-        ),
+        FOJ("attendance", ("a0", "member_id", "a5", "link_to_member")),
+        FOJ("event", ("a5", "link_to_event", "a6", "event_id")),
         FOJ("zip_code", ("a0", "zip", "a7", "zip_code")),
     ),
 )
@@ -185,6 +184,38 @@ _TOXICOLOGY = OneNfSpec(
     ),
 )
 
+# Spider: leaf fact cars_data → car_names → model_list → car_makers → countries → continents
+_CAR_1 = OneNfSpec(
+    anchor_table="cars_data",
+    join_steps=(
+        FOJ("car_names", ("a0", "Id", "a1", "MakeId")),
+        FOJ("model_list", ("a1", "Model", "a2", "Model")),
+        FOJ("car_makers", ("a2", "Maker", "a3", "Id")),
+        FOJ("countries", ("a3", "Country", "a4", "CountryId")),
+        FOJ("continents", ("a4", "Continent", "a5", "ContId")),
+    ),
+)
+
+# Spider: TV_Channel hub; TV_series and Cartoon are sibling facts on Channel (may cartesian per channel)
+_TVSHOW = OneNfSpec(
+    anchor_table="TV_Channel",
+    join_steps=(
+        FOJ("TV_series", ("a0", "id", "a1", "Channel")),
+        FOJ("Cartoon", ("a0", "id", "a2", "Channel")),
+    ),
+)
+
+# WAMEX (Acuity held-out): star on anumber; abstracts 1:1, then sibling facts by match ratio
+_WAMEX = OneNfSpec(
+    anchor_table="wamex_reports",
+    join_steps=(
+        FOJ("abstracts", ("a0", "anumber", "a1", "anumber")),
+        FOJ("storages", ("a0", "anumber", "a2", "anumber")),
+        FOJ("drilling_summaries", ("a0", "anumber", "a3", "anumber")),
+        FOJ("geo_chemistry", ("a0", "anumber", "a4", "anumber")),
+    ),
+)
+
 SPECS: dict[str, OneNfSpec] = {
     "formula_1": _FORMULA_1,
     "debit_card_specializing": _DEBIT_CARD,
@@ -195,4 +226,7 @@ SPECS: dict[str, OneNfSpec] = {
     "student_club": _STUDENT_CLUB,
     "thrombosis_prediction": _THROMBOSIS_PREDICTION,
     "toxicology": _TOXICOLOGY,
+    "car_1": _CAR_1,
+    "tvshow": _TVSHOW,
+    "wamex": _WAMEX,
 }
