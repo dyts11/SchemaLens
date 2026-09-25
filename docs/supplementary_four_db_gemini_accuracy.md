@@ -156,8 +156,8 @@ Execution accuracy by database and **simple / moderate / challenging** for **L1�
 
 ## 5. Related docs
 
-- `docs/experiment_design.md` — §12 schema complexity buckets (table-count rules)
-- `docs/gemini_S3_error_analysis_L1_L2_L3.md` — error-type analysis (all 9 DBs, L1–L3)
+- `docs/plans/experiment_design.md` — §12 schema complexity buckets (table-count rules)
+- `docs/error_analysis/gemini_S3_error_analysis_L1_L2_L3.md` — error-type analysis (all 9 DBs, L1–L3)
 - `docs/main_experiment_accuracy_tables.md` — full-model accuracy tables
 
 ---

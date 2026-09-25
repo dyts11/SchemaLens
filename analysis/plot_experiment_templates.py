@@ -3,7 +3,7 @@
 Publication-style placeholder figures for the 6×3 schema-effect experiment.
 
 Generates empty templates (no real accuracy data) to embed in
-docs/experiment_design.md. Re-run after experiments by filling the
+docs/plans/experiment_design.md. Re-run after experiments by filling the
 arrays below or extending this script to read results/*.csv.
 
 Usage (from schema_effect/):

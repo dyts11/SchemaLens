@@ -142,7 +142,7 @@ Wave 1 uses a single model (`gemini-2.5-flash`); “all models” collapses to t
 
 ### 6.2 Heatmap (6 × 3)
 
-![6×3 execution accuracy heatmap — fill after experiment](figures/main_experiment_gemini-2.5-flash_heatmap.png)
+![6×3 execution accuracy heatmap — fill after experiment](../figures/main_experiment_gemini-2.5-flash_heatmap.png)
 
 |  | **S1** | **S2** | **S3** |
 |--|--------|--------|--------|
@@ -161,7 +161,7 @@ Wave 1 uses a single model (`gemini-2.5-flash`); “all models” collapses to t
 
 ### 6.3 Overall accuracy by structural vs semantic level (model × level tables)
 
-![Overall marginal accuracy — model × structural / semantic tables](figures/main_experiment_overall_marginal_tables.png)
+![Overall marginal accuracy — model × structural / semantic tables](../figures/main_experiment_overall_marginal_tables.png)
 
 **Purpose:** Compare the **marginal effect size** of each dimension **per model**, in the same layout as a standard results table (reference: Fewshot × Model × 1NF/2NF/3NF, but here **Model** replaces Fewshot). Place the **structural** and **semantic** tables **side by side**. The dimension with a **larger spread** across columns (L1→L6 vs S1→S3) is the **dominant** dimension for that model.
 
@@ -189,7 +189,7 @@ Wave 1 uses a single model (`gemini-2.5-flash`); “all models” collapses to t
 
 ### 6.4 Accuracy by difficulty tier — structural dimension (line chart)
 
-![Accuracy by difficulty × structural level](figures/main_experiment_difficulty_by_structure.png)
+![Accuracy by difficulty × structural level](../figures/main_experiment_difficulty_by_structure.png)
 
 **Purpose:** Does **structural observability** matter more for **harder** queries? If challenging queries show a steeper L1→L6 slope than simple queries, structure helps most when the task is difficult.
 
@@ -206,7 +206,7 @@ Wave 1 uses a single model (`gemini-2.5-flash`); “all models” collapses to t
 
 ### 6.5 Accuracy by difficulty tier — semantic dimension (line chart)
 
-![Accuracy by difficulty × semantic level](figures/main_experiment_difficulty_by_semantics.png)
+![Accuracy by difficulty × semantic level](../figures/main_experiment_difficulty_by_semantics.png)
 
 **Purpose:** Same question as §6.4 for **semantic richness**. Compare line separation and slopes to §6.4: if challenging queries gain more from S1→S3 than simple ones, semantics and difficulty interact; if the pattern differs from the structural chart, the two dimensions behave differently under difficulty.
 
@@ -372,7 +372,7 @@ Three **supplementary** analyses from the original research design. They use **e
 
 ### 1. Schema complexity moderation (line chart)
 
-![Schema complexity moderation — L3 / L4 / L5 × size bucket](figures/casestudy_schema_complexity.png)
+![Schema complexity moderation — L3 / L4 / L5 × size bucket](../figures/casestudy_schema_complexity.png)
 
 **Research question:** Does **relation metadata** (L4, L5) help **more on larger schemas**? If the three lines **fan out** as schema size grows, structural detail interacts with complexity. If lines stay **parallel**, structural level does not interact with schema size.
 
@@ -421,14 +421,14 @@ Accuracy = mean `correct` over questions in bucket, for `results/gemini-2.5-flas
 
 ### Outputs
 
-- Figure: `figures/casestudy_schema_complexity.{png,svg,pdf}`
+- Figure: `../figures/casestudy_schema_complexity.{png,svg,pdf}`
 - Source CSVs: `results/{model}__L3S3.csv`, `L4S3`, `L5S3`
 
 ---
 
 ### 2. Value examples effect on filter queries (before/after bar chart)
 
-![Value examples — filter queries by difficulty](figures/casestudy_value_examples.png)
+![Value examples — filter queries by difficulty](../figures/casestudy_value_examples.png)
 
 **Research question:** Can **sample categorical values** in the schema (e.g. `status -- values: active, inactive`) recover accuracy on **filter-heavy** queries where models hallucinate literals?
 
@@ -472,13 +472,13 @@ Accuracy = mean `correct` over questions in bucket, for `results/gemini-2.5-flas
 
 ### Outputs
 
-- Figure: `figures/casestudy_value_examples.{png,svg,pdf}`
+- Figure: `../figures/casestudy_value_examples.{png,svg,pdf}`
 
 ---
 
 ### 3. Mixed semantic level comparison (bar chart)
 
-![Mixed semantic levels at fixed structure](figures/casestudy_mixed_semantics.png)
+![Mixed semantic levels at fixed structure](../figures/casestudy_mixed_semantics.png)
 
 **Research question:** Is **inconsistent** naming (mixed S levels within one schema) worse than **uniform** low quality?
 
@@ -519,6 +519,6 @@ Suggested CSVs: `results/{model}__L5S1.csv`, `L5S2`, `L5S3` (main grid) plus `re
 
 ### Outputs
 
-- Figure: `figures/casestudy_mixed_semantics.{png,svg,pdf}`
+- Figure: `../figures/casestudy_mixed_semantics.{png,svg,pdf}`
 
 ---

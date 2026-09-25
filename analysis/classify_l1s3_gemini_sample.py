@@ -8,7 +8,7 @@ Categories:
   (c) unrecoverable evaluation artefact — executes but 1NF multiset ≠ 3NF gold;
       simple DISTINCT repair does not restore gold
 
-Output: docs/gemini_L1S3_wrong_answer_sample50.md
+Output: docs/error_analysis/gemini_L1S3_wrong_answer_sample50.md
 """
 
 from __future__ import annotations

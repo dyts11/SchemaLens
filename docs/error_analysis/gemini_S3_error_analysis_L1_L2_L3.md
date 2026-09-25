@@ -344,6 +344,6 @@ An earlier draft labelled **163** L2 failures as fan-out by applying the **broad
 
 - `results/gemini-2.5-flash__L1S3.csv`, `L2S3.csv`, `L3S3.csv`
 - `docs/l1s3_gemini_error_types.md`, `docs/l3s3_gemini_error_types.md` — short per-level extracts pointing here
-- `docs/l1s3_aggregate_eval_examples.md` — stand-alone copy of Part V
+- `docs/error_analysis/l1s3_aggregate_eval_examples.md` — stand-alone copy of Part V
 - `src/evaluator.py`, `preprocess_data/to_1nf/`, `preprocess_data/to_2nf/`
 
