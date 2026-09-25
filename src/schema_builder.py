@@ -51,6 +51,11 @@ MATERIALISED_DB_IDS = frozenset(
         "superhero",
         "thrombosis_prediction",
         "toxicology",
+        # Spider databases (materialised under spider_data/database/)
+        "car_1",
+        "tvshow",
+        # WAMEX held-out database (materialised under wamex_data/database/)
+        "wamex",
     }
 )
 L1_DB_IDS = MATERIALISED_DB_IDS  # alias
@@ -68,9 +73,12 @@ class SchemaBuilder:
                   dev_tables.json and the dev_databases/ subfolder.
     """
 
-    def __init__(self, db_id: str, data_dir: Union[str, Path]):
+    def __init__(self, db_id: str, data_dir: Union[str, Path], layout=None):
+        from preprocess_data.data_layout import DataLayout
+
         self.db_id = db_id
         self.data_dir = Path(data_dir)
+        self.layout = layout if layout is not None else DataLayout.create(data_dir)
         self._meta = self._load_metadata()
         self._pragma = self._load_pragma_info()
         self._descriptions = self._load_descriptions()
@@ -106,22 +114,36 @@ class SchemaBuilder:
         return self._format_schema(structural_level, semantic_level)
 
     @staticmethod
-    def one_nf_sqlite_path(data_dir: Union[str, Path], db_id: str) -> Path:
+    def one_nf_sqlite_path(data_dir: Union[str, Path], db_id: str, layout=None) -> Path:
         """Path to the materialised 1NF SQLite file (physical S3 column names)."""
+        if layout is not None:
+            return layout.one_nf_sqlite(db_id)
         return Path(data_dir) / "dev_databases" / db_id / f"{db_id}__1nf.sqlite"
 
     @classmethod
-    def has_one_nf_database(cls, data_dir: Union[str, Path], db_id: str) -> bool:
-        return db_id in L1_DB_IDS and cls.one_nf_sqlite_path(data_dir, db_id).is_file()
+    def has_one_nf_database(
+        cls, data_dir: Union[str, Path], db_id: str, layout=None
+    ) -> bool:
+        return (
+            db_id in L1_DB_IDS
+            and cls.one_nf_sqlite_path(data_dir, db_id, layout).is_file()
+        )
 
     @staticmethod
-    def two_nf_sqlite_path(data_dir: Union[str, Path], db_id: str) -> Path:
+    def two_nf_sqlite_path(data_dir: Union[str, Path], db_id: str, layout=None) -> Path:
         """Path to the materialised 2NF SQLite file (physical S3 column names)."""
+        if layout is not None:
+            return layout.two_nf_sqlite(db_id)
         return Path(data_dir) / "dev_databases" / db_id / f"{db_id}__2nf.sqlite"
 
     @classmethod
-    def has_two_nf_database(cls, data_dir: Union[str, Path], db_id: str) -> bool:
-        return db_id in L2_DB_IDS and cls.two_nf_sqlite_path(data_dir, db_id).is_file()
+    def has_two_nf_database(
+        cls, data_dir: Union[str, Path], db_id: str, layout=None
+    ) -> bool:
+        return (
+            db_id in L2_DB_IDS
+            and cls.two_nf_sqlite_path(data_dir, db_id, layout).is_file()
+        )
 
     # ------------------------------------------------------------------ #
     #  Data loading                                                        #
@@ -137,7 +159,7 @@ class SchemaBuilder:
           - foreign_keys_raw: raw list of [from_idx, to_idx] pairs (used by L6)
           - col_lookup    : {col_idx: {table, name, type}}
         """
-        tables_path = self.data_dir / "dev_tables.json"
+        tables_path = self.layout.tables_json
         with open(tables_path, encoding="utf-8") as f:
             all_entries = json.load(f)
         entry = next(t for t in all_entries if t["db_id"] == self.db_id)
@@ -209,9 +231,7 @@ class SchemaBuilder:
         Returns:
             {table_name: {col_name: {"notnull": bool}}}
         """
-        db_path = (
-            self.data_dir / "dev_databases" / self.db_id / f"{self.db_id}.sqlite"
-        )
+        db_path = self.layout.source_sqlite(self.db_id)
         pragma_data: dict = {}
         conn = sqlite3.connect(str(db_path))
         try:
@@ -235,10 +255,11 @@ class SchemaBuilder:
         Returns:
             {table_name: {original_column_name: full_description_string}}
         """
-        desc_dir = (
-            self.data_dir / "dev_databases" / self.db_id / "database_description"
-        )
+        desc_dir = self.layout.description_dir(self.db_id)
         descriptions: dict = {}
+
+        if not desc_dir.is_dir():
+            return {t: {} for t in self._meta["table_names"]}
 
         for table_name in self._meta["table_names"]:
             # CSV filenames may differ in capitalisation from table names
@@ -287,7 +308,7 @@ class SchemaBuilder:
             raise ValueError(
                 f"No 1NF database for db_id={self.db_id!r}. Supported: {supported}"
             )
-        path = self.one_nf_sqlite_path(self.data_dir, self.db_id)
+        path = self.one_nf_sqlite_path(self.data_dir, self.db_id, self.layout)
         if not path.is_file():
             raise FileNotFoundError(
                 f"1NF database not found: {path}\n"
@@ -298,7 +319,10 @@ class SchemaBuilder:
         from preprocess_data.to_1nf.convert import build_plan
 
         display_columns = build_plan(
-            self.db_id, self.data_dir, semantic_level=semantic_level
+            self.db_id,
+            self.data_dir,
+            semantic_level=semantic_level,
+            tables_path=self.layout.tables_json,
         ).display_columns
 
         lines = [
@@ -325,7 +349,7 @@ class SchemaBuilder:
             raise ValueError(
                 f"No 2NF database for db_id={self.db_id!r}. Supported: {supported}"
             )
-        path = self.two_nf_sqlite_path(self.data_dir, self.db_id)
+        path = self.two_nf_sqlite_path(self.data_dir, self.db_id, self.layout)
         if not path.is_file():
             raise FileNotFoundError(
                 f"2NF database not found: {path}\n"
@@ -336,9 +360,16 @@ class SchemaBuilder:
         from preprocess_data.to_2nf.convert import build_plan, _anchor_pk_labels
         from preprocess_data.to_2nf.specs import SPECS
 
-        plan = build_plan(self.db_id, self.data_dir, semantic_level=semantic_level)
+        plan = build_plan(
+            self.db_id,
+            self.data_dir,
+            semantic_level=semantic_level,
+            tables_path=self.layout.tables_json,
+        )
         spec = SPECS[self.db_id]
-        anchor_pks = _anchor_pk_labels(self.db_id, self.data_dir)
+        anchor_pks = _anchor_pk_labels(
+            self.db_id, self.data_dir, tables_path=self.layout.tables_json
+        )
 
         lines = [
             "-- L2 · 2NF synthetic clusters (denormalised hubs; not 3NF).",

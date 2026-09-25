@@ -12,10 +12,16 @@ Usage (from schema_effect/):
     # Edit MODELS below, then:
     python -m src.rerun_db_experiment european_football_2
 
-    # Or override models on the command line:
+    # Or override models / conditions on the command line:
     python -m src.rerun_db_experiment european_football_2 \\
-        --models qwen2.5-coder-14b-local gemini-2.5-flash \\
+        --models qwen2.5-coder-7b-local \\
+        --structural-levels 1 --semantic-levels 2,3 \\
         --dry-run
+
+    # Local Gemini API rerun (see scripts/run_rerun_gemini_local.sh):
+    python -m src.rerun_db_experiment european_football_2 \\
+        --models gemini-2.5-flash \\
+        --structural-levels 1 --semantic-levels 1,2,3
 """
 
 from __future__ import annotations
@@ -122,7 +128,12 @@ def _parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     return p.parse_args(argv)
 
 
-def _parse_int_list(spec: str, name: str) -> List[int]:
+def _parse_int_list(
+    spec: str,
+    name: str,
+    *,
+    allowed: Optional[range] = None,
+) -> List[int]:
     out: List[int] = []
     for part in spec.split(","):
         part = part.strip()
@@ -131,6 +142,13 @@ def _parse_int_list(spec: str, name: str) -> List[int]:
         out.append(int(part))
     if not out:
         raise ValueError(f"{name} must list at least one integer")
+    if allowed is not None:
+        bad = [x for x in out if x not in allowed]
+        if bad:
+            raise ValueError(
+                f"{name} invalid value(s) {bad} parsed from {spec!r}. "
+                "On SLURM, use dashes in --export (e.g. SEMANTIC_LEVELS=2-3)."
+            )
     return out
 
 
@@ -312,8 +330,12 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
     args = _parse_args(argv)
     db_id = args.db_id
     results_dir = (_ROOT / args.results_dir).resolve()
-    struct_levels = _parse_int_list(args.structural_levels, "--structural-levels")
-    sem_levels = _parse_int_list(args.semantic_levels, "--semantic-levels")
+    struct_levels = _parse_int_list(
+        args.structural_levels, "--structural-levels", allowed=range(1, 7)
+    )
+    sem_levels = _parse_int_list(
+        args.semantic_levels, "--semantic-levels", allowed=range(1, 4)
+    )
     conditions = _conditions(struct_levels, sem_levels)
 
     questions = load_questions_for_db(db_id)

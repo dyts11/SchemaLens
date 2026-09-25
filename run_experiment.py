@@ -9,9 +9,11 @@ completed are skipped — you can safely interrupt and resume at any time.
 
 Usage:
     python run_experiment.py
+    python run_experiment.py --spider-dir dev_20240627/spider_data \\
+        --condition L3S3 --models gemini-2.5-flash
 
 Output:
-    results/results.csv   — one row per (question, condition, model)
+    results/ or results/spider/   — one CSV per (model, condition)
 
 Columns in results.csv:
     question_id, db_id, difficulty, question_type,
@@ -22,9 +24,12 @@ Questions are loaded from dev_20240627/arcwise_plat_sql.json; difficulty and
 question_type are joined from dev.json and question_types.json by question_id.
 """
 
+import argparse
 import csv
+import fcntl
 import json
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -42,12 +47,19 @@ except ImportError:
 from src.schema_builder import SchemaBuilder
 from src.prompt_builder import build_prompt
 from src.llm_runner import call_llm
+from src.few_shot import (
+    select_fixed_examples_by_difficulty,
+    load_few_shot_json,
+    get_sql_for_struct_level,
+    adapt_sql_to_semantic_level,
+)
 from src.evaluator import (
     evaluate,
     build_col_rename_map,
     build_l1_col_rename_map,
     build_l2_col_rename_map,
 )
+from preprocess_data.data_layout import DataLayout
 from preprocess_data.questions.question_classifier import load_question_types
 
 # ---------------------------------------------------------------------------
@@ -60,24 +72,133 @@ DEV_JSON_PATH = os.path.join(DATA_DIR, "dev.json")
 RESULTS_DIR = "results"
 QUESTIONS_DIR = "preprocess_data/questions"
 
-def results_file(model: str, struct_level: int, sem_level: int) -> str:
+# ---------------------------------------------------------------------------
+# Spider mode
+# ---------------------------------------------------------------------------
+# Set SPIDER_DIR to a Spider data root (containing database/ and tables.json)
+# to run the experiment on Spider databases instead of the BIRD arcwise set.
+# When set, questions are loaded from SPIDER_QUESTIONS_PATH (already converted
+# to the experiment format: question_id, db_id, question, SQL, evidence,
+# difficulty, question_type). Set SPIDER_DIR = None for the default BIRD run.
+SPIDER_DIR: Optional[str] = None
+SPIDER_QUESTIONS_PATH = os.path.join(
+    DATA_DIR, "spider_data", "experiment_questions_car1_tvshow.json"
+)
+
+
+def get_data_layout() -> DataLayout:
+    """Resolve the active data layout (BIRD by default, Spider when SPIDER_DIR is set)."""
+    return DataLayout.create(DATA_DIR, spider_dir=SPIDER_DIR)
+
+def results_file(
+    model: str,
+    struct_level: int,
+    sem_level: int,
+    results_dir: Optional[str] = None,
+    few_shot_n: int = 0,
+    cot: bool = False,
+    evidence: bool = False,
+) -> str:
     """Return the CSV path for a specific (model, condition) combination.
-    Example: results/llama-3.3-70b-or__L3S3.csv
+    Examples:
+      results/llama-3.3-70b-or__L3S3.csv              (zero-shot)
+      results/llama-3.3-70b-or__L3S3__fs3.csv         (3-shot)
+      results/llama-3.3-70b-or__L3S3__cot__ev.csv     (cot + evidence)
     """
     safe_model = model.replace("/", "-")
-    return f"{RESULTS_DIR}/{safe_model}__L{struct_level}S{sem_level}.csv"
+    out_dir = results_dir or RESULTS_DIR
+    fs_suffix = f"__fs{few_shot_n}" if few_shot_n > 0 else ""
+    cot_suffix = "__cot" if cot else ""
+    ev_suffix = "__ev" if evidence else ""
+    return f"{out_dir}/{safe_model}__L{struct_level}S{sem_level}{fs_suffix}{cot_suffix}{ev_suffix}.csv"
+
+
+def _parse_condition(value: str) -> Tuple[int, int]:
+    m = re.fullmatch(r"[Ll](\d+)[Ss](\d+)", value)
+    if not m:
+        raise argparse.ArgumentTypeError(
+            f"Invalid condition {value!r}; expected format L3S3"
+        )
+    return int(m.group(1)), int(m.group(2))
+
+
+def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
+    p = argparse.ArgumentParser(description="Run the schema-effect experiment.")
+    p.add_argument(
+        "--spider-dir",
+        default=None,
+        help="Spider data root (database/ + tables.json). Enables Spider mode.",
+    )
+    p.add_argument(
+        "--questions",
+        default=None,
+        help="Spider-mode question file in experiment format "
+             "(default: SPIDER_QUESTIONS_PATH), e.g. "
+             "dev_20240627/wamex_data/experiment_questions_wamex.json.",
+    )
+    p.add_argument(
+        "--results-dir",
+        default=None,
+        help="Output directory (default: results/spider in Spider mode, else results).",
+    )
+    p.add_argument(
+        "--condition",
+        action="append",
+        dest="conditions",
+        type=_parse_condition,
+        metavar="LnSm",
+        help="Condition to run, e.g. L3S3 (repeatable; default: all 18).",
+    )
+    p.add_argument(
+        "--models",
+        nargs="+",
+        default=None,
+        help="Models to run (default: MODELS in config).",
+    )
+    p.add_argument(
+        "--few-shot",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Number of per-database few-shot examples (0 = zero-shot, default: FEW_SHOT_N).",
+    )
+    p.add_argument(
+        "--cot",
+        action="store_true",
+        default=False,
+        help="Prepend a step-by-step query writing guide to every prompt.",
+    )
+    p.add_argument(
+        "--evidence",
+        action="store_true",
+        default=False,
+        help="Include the question's evidence field as a '### Evidence:' block in the prompt.",
+    )
+    return p.parse_args(argv)
 
 # Conditions to run: list of (structural_level, semantic_level) tuples
+# Remaining Spider (gemini-2.5 L3S1–S3 done). Reset to all 18 for full runs:
+#   [(s, m) for s in range(1, 7) for m in range(1, 4)]
 CONDITIONS = [
-    (struct, sem)
-    for struct in range(1, 7)   # L1–L6
-    for sem in range(1, 4)      # S1–S3
+    (1, 1), (1, 2), (1, 3),
+    (2, 1), (2, 2), (2, 3),
+    (4, 1), (4, 2), (4, 3),
+    (5, 1), (5, 2), (5, 3),
+    (6, 1), (6, 2), (6, 3),
 ]
 
 # Models to run
 MODELS = [
-    "gemini-3.5-flash",
+    "gemini-2.5-flash",
 ]
+
+# Few-shot configuration
+# Set to 0 for zero-shot (default). Set to n > 0 to include n per-database
+# examples drawn from arcwise_plat_sql.json (excluding the test question).
+# Results are written to separate CSVs with an '__fsN' suffix.
+# Note: for L1/L2 conditions the examples use original 3NF SQL, which does not
+# align with the denormalised schema — their examples show task format only.
+FEW_SHOT_N: int = 0
 
 # Per-model delay in seconds between API calls to respect rate limits.
 MODEL_DELAY = {
@@ -198,6 +319,35 @@ def load_experiment_questions(
     return questions
 
 
+def load_spider_questions(path: str = SPIDER_QUESTIONS_PATH) -> List[dict]:
+    """
+    Load pre-converted Spider questions (already in experiment format:
+    question_id, db_id, question, SQL, evidence, difficulty, question_type).
+    """
+    with open(path, encoding="utf-8") as f:
+        records = json.load(f)
+
+    questions: List[dict] = []
+    for rec in records:
+        missing = [k for k in ("question_id", "db_id", "question", "SQL") if k not in rec]
+        if missing:
+            raise KeyError(
+                f"Spider question record missing keys {missing} in {path}: {rec!r}"
+            )
+        questions.append(
+            {
+                "question_id": int(rec["question_id"]),
+                "db_id": rec["db_id"],
+                "question": rec["question"],
+                "SQL": rec["SQL"],
+                "evidence": rec.get("evidence"),
+                "difficulty": rec.get("difficulty"),
+                "question_type": rec.get("question_type", "unknown"),
+            }
+        )
+    return questions
+
+
 # ---------------------------------------------------------------------------
 # CSV schema
 # ---------------------------------------------------------------------------
@@ -238,30 +388,41 @@ def load_completed_with_correct(csv_path: str) -> Tuple[set, int]:
 
 def append_row(csv_path: str, row: dict) -> None:
     """Append one result row to the CSV (writes header if file is new)."""
+    parent = os.path.dirname(csv_path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
     file_exists = os.path.exists(csv_path)
     with open(csv_path, "a", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=CSV_COLUMNS)
-        if not file_exists:
-            writer.writeheader()
-        writer.writerow(row)
+        fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+        try:
+            writer = csv.DictWriter(f, fieldnames=CSV_COLUMNS)
+            if not file_exists:
+                writer.writeheader()
+            writer.writerow(row)
+        finally:
+            fcntl.flock(f.fileno(), fcntl.LOCK_UN)
 
 
 def validate_run_prerequisites(
     questions: List[dict],
     conditions: List[Tuple[int, int]],
+    layout: Optional[DataLayout] = None,
 ) -> None:
     """
     Fail fast if required SQLite files or schema support are missing for this run.
     """
     from src.schema_builder import L1_DB_IDS, L2_DB_IDS
 
+    if layout is None:
+        layout = DataLayout.create(DATA_DIR)
+
     db_ids = sorted({q["db_id"] for q in questions})
     struct_levels = {sl for sl, _ in conditions}
     missing: List[str] = []
 
     for db_id in db_ids:
-        p3 = os.path.join(DATA_DIR, "dev_databases", db_id, f"{db_id}.sqlite")
-        if not os.path.isfile(p3):
+        p3 = layout.source_sqlite(db_id)
+        if not p3.is_file():
             missing.append(f"3NF: {p3}")
 
         if 1 in struct_levels:
@@ -269,16 +430,16 @@ def validate_run_prerequisites(
                 missing.append(
                     f"L1: no 1NF spec for {db_id!r} (supported: {sorted(L1_DB_IDS)})"
                 )
-            elif not SchemaBuilder.has_one_nf_database(DATA_DIR, db_id):
-                missing.append(f"L1: {SchemaBuilder.one_nf_sqlite_path(DATA_DIR, db_id)}")
+            elif not SchemaBuilder.has_one_nf_database(DATA_DIR, db_id, layout):
+                missing.append(f"L1: {layout.one_nf_sqlite(db_id)}")
 
         if 2 in struct_levels:
             if db_id not in L2_DB_IDS:
                 missing.append(
                     f"L2: no 2NF spec for {db_id!r} (supported: {sorted(L2_DB_IDS)})"
                 )
-            elif not SchemaBuilder.has_two_nf_database(DATA_DIR, db_id):
-                missing.append(f"L2: {SchemaBuilder.two_nf_sqlite_path(DATA_DIR, db_id)}")
+            elif not SchemaBuilder.has_two_nf_database(DATA_DIR, db_id, layout):
+                missing.append(f"L2: {layout.two_nf_sqlite(db_id)}")
 
     if missing:
         raise FileNotFoundError(
@@ -298,20 +459,78 @@ def print_progress(done: int, total: int, correct: int, condition: str, model: s
     )
 
 
-def run() -> None:
-    all_questions = load_experiment_questions()
-    print(
-        f"Loaded {len(all_questions)} questions from {ARCWISE_QUESTIONS_PATH} "
-        f"(difficulty from {DEV_JSON_PATH}, types from question_types.json)"
+def run(
+    *,
+    spider_dir: Optional[str] = None,
+    questions_path: Optional[str] = None,
+    results_dir: Optional[str] = None,
+    conditions: Optional[List[Tuple[int, int]]] = None,
+    models: Optional[List[str]] = None,
+    few_shot_n: Optional[int] = None,
+    cot: bool = False,
+    evidence: bool = False,
+) -> None:
+    active_spider_dir = spider_dir if spider_dir is not None else SPIDER_DIR
+    layout = DataLayout.create(DATA_DIR, spider_dir=active_spider_dir)
+    spider_mode = layout.layout == "spider"
+    active_results_dir = (
+        results_dir
+        if results_dir is not None
+        else ("results/spider" if spider_mode else RESULTS_DIR)
     )
+    active_conditions = conditions if conditions is not None else CONDITIONS
+    active_models = models if models is not None else MODELS
+    active_few_shot_n = few_shot_n if few_shot_n is not None else FEW_SHOT_N
+    active_cot = cot
+    active_evidence = evidence
+    tables_path = str(layout.tables_json)
+
+    os.makedirs(active_results_dir, exist_ok=True)
+
+    if spider_mode:
+        active_questions_path = questions_path or SPIDER_QUESTIONS_PATH
+        all_questions = load_spider_questions(active_questions_path)
+        print(
+            f"[Spider mode] Loaded {len(all_questions)} questions from "
+            f"{active_questions_path}"
+        )
+        print(f"  data layout : {layout.layout}")
+        print(f"  database dir: {layout.database_dir}")
+        print(f"  tables json : {layout.tables_json}")
+    else:
+        all_questions = load_experiment_questions()
+        print(
+            f"Loaded {len(all_questions)} questions from {ARCWISE_QUESTIONS_PATH} "
+            f"(difficulty from {DEV_JSON_PATH}, types from question_types.json)"
+        )
+
+    # Select fixed few-shot examples from BIRD questions before any filtering.
+    # One question per difficulty level (simple/moderate/challenging) per DB.
+    # These reserved questions are excluded from the evaluation set.
+    reserved_for_few_shot: set = set()
+    few_shot_json: dict = {}
+    if active_few_shot_n > 0 and not spider_mode:
+        _, reserved_for_few_shot = select_fixed_examples_by_difficulty(all_questions)
+        few_shot_json = load_few_shot_json()
+        print(f"Few-shot: {active_few_shot_n}-shot — reserved "
+              f"{len(reserved_for_few_shot)} questions as fixed examples (1 per difficulty per DB)")
+        for db_id in sorted(few_shot_json):
+            print(f"  {db_id}: {len(few_shot_json[db_id])} example(s)")
 
     stratified = STRATIFIED_DB_SAMPLE if STRATIFIED_DB_SAMPLE else None
     questions = select_questions(
         all_questions,
         stratified_slices=stratified,
         max_prefix=MAX_QUESTIONS,
-        exclude_db_ids=ARCWISE_EXCLUDED_DB_IDS,
+        exclude_db_ids=None if spider_mode else ARCWISE_EXCLUDED_DB_IDS,
     )
+
+    # Remove reserved few-shot questions from the evaluation set
+    if reserved_for_few_shot:
+        before = len(questions)
+        questions = [q for q in questions if q["question_id"] not in reserved_for_few_shot]
+        print(f"  Removed {before - len(questions)} reserved example questions from test set")
+
     if stratified:
         print("Question selection: stratified (first n per db in arcwise file order)")
         for db_id, n in stratified:
@@ -320,10 +539,13 @@ def run() -> None:
         from collections import Counter
 
         by_db = Counter(q["db_id"] for q in questions)
-        print(
-            "Question selection: all arcwise questions in 9 databases "
-            f"(excluding {', '.join(sorted(ARCWISE_EXCLUDED_DB_IDS))})"
-        )
+        if spider_mode:
+            print(f"Question selection: all Spider questions in {len(by_db)} databases")
+        else:
+            print(
+                "Question selection: all arcwise questions in 9 databases "
+                f"(excluding {', '.join(sorted(ARCWISE_EXCLUDED_DB_IDS))})"
+            )
         for db_id in sorted(by_db):
             print(f"  {db_id}: {by_db[db_id]} questions")
     if MAX_QUESTIONS is not None:
@@ -333,49 +555,57 @@ def run() -> None:
     n_agg = sum(1 for q in questions if q["question_type"] == "aggregate")
     print(f"  {n_agg} aggregate, {len(questions) - n_agg} retrieval")
 
-    validate_run_prerequisites(questions, CONDITIONS)
+    validate_run_prerequisites(questions, active_conditions, layout)
 
     # Pre-build one SchemaBuilder per database (reused across conditions)
     db_ids = list({q["db_id"] for q in questions})
     print(f"Building schema metadata for {len(db_ids)} databases...")
-    builders = {db_id: SchemaBuilder(db_id, DATA_DIR) for db_id in db_ids}
+    builders = {db_id: SchemaBuilder(db_id, DATA_DIR, layout) for db_id in db_ids}
 
     # Pre-build column rename maps for every (db, semantic_level) combination
     # so the evaluator can run predicted SQL against correctly-named views.
     # Returns None when no renaming is needed (e.g. S3 with original names).
-    sem_levels_needed = {sem for _, sem in CONDITIONS}
+    sem_levels_needed = {sem for _, sem in active_conditions}
     from src.schema_builder import L1_DB_IDS, L2_DB_IDS
 
     rename_maps = {
-        (db_id, sem): build_col_rename_map(db_id, DATA_DIR, sem)
+        (db_id, sem): build_col_rename_map(db_id, DATA_DIR, sem, tables_path)
         for db_id in db_ids
         for sem in sem_levels_needed
     }
     l1_rename_maps = {
-        (db_id, sem): build_l1_col_rename_map(db_id, DATA_DIR, sem)
+        (db_id, sem): build_l1_col_rename_map(db_id, DATA_DIR, sem, tables_path)
         for db_id in db_ids
         if db_id in L1_DB_IDS
         for sem in sem_levels_needed
     }
     l2_rename_maps = {
-        (db_id, sem): build_l2_col_rename_map(db_id, DATA_DIR, sem)
+        (db_id, sem): build_l2_col_rename_map(db_id, DATA_DIR, sem, tables_path)
         for db_id in db_ids
         if db_id in L2_DB_IDS
         for sem in sem_levels_needed
     }
 
-    total_runs = len(CONDITIONS) * len(MODELS) * len(questions)
+
+    total_runs = len(active_conditions) * len(active_models) * len(questions)
     print(f"\nTotal runs planned : {total_runs}")
+    print(f"Results directory  : {active_results_dir}/")
     print()
 
     overall_done = 0
     overall_correct = 0
 
-    for struct_level, sem_level in CONDITIONS:
+    for struct_level, sem_level in active_conditions:
         condition_label = f"L{struct_level}·S{sem_level}"
 
-        for model in MODELS:
-            csv_path = results_file(model, struct_level, sem_level)
+        for model in active_models:
+            csv_path = results_file(
+                model, struct_level, sem_level,
+                results_dir=active_results_dir,
+                few_shot_n=active_few_shot_n,
+                cot=active_cot,
+                evidence=active_evidence,
+            )
 
             # Load completed question_ids for this specific file
             completed, correct = load_completed_with_correct(csv_path)
@@ -392,21 +622,53 @@ def run() -> None:
             pred_conn_by_db = {}
             try:
                 for q in questions:
-                    # Skip if already done (checkpoint)
+                    # Skip if already done (checkpoint); re-read disk in case of resume.
                     if q["question_id"] in completed:
+                        continue
+                    disk_completed, disk_correct = load_completed_with_correct(csv_path)
+                    if q["question_id"] in disk_completed:
+                        completed = disk_completed
+                        correct = disk_correct
+                        done = len(completed)
                         continue
 
                     db_id = q["db_id"]
-                    db_path = os.path.join(
-                        DATA_DIR, "dev_databases", db_id, f"{db_id}.sqlite"
-                    )
+                    db_path = str(layout.source_sqlite(db_id))
 
                     # Build schema string for this condition
                     schema = builders[db_id].build(struct_level, sem_level)
 
+                    # Build few-shot examples for this question (fixed per DB).
+                    # Load examples from JSON, pick the sql_l1/l2/l3 variant for
+                    # this structural level, then apply semantic column renaming.
+                    few_shot_examples = None
+                    if active_few_shot_n > 0 and few_shot_json:
+                        db_entries = few_shot_json.get(db_id, [])
+                        if struct_level == 1:
+                            sem_rename = l1_rename_maps.get((db_id, sem_level))
+                        elif struct_level == 2:
+                            sem_rename = l2_rename_maps.get((db_id, sem_level))
+                        else:
+                            sem_rename = rename_maps.get((db_id, sem_level))
+                        few_shot_examples = [
+                            (
+                                e["question"],
+                                adapt_sql_to_semantic_level(
+                                    get_sql_for_struct_level(e, struct_level),
+                                    sem_rename,
+                                ),
+                            )
+                            for e in db_entries
+                        ]
+
                     # Build prompt
                     prompt = build_prompt(
-                        schema, q["question"], structural_level=struct_level
+                        schema, q["question"],
+                        structural_level=struct_level,
+                        semantic_level=sem_level,
+                        few_shot_examples=few_shot_examples,
+                        include_cot=active_cot,
+                        evidence=q.get("evidence") if active_evidence else None,
                     )
 
                     #print(
@@ -427,9 +689,11 @@ def run() -> None:
 
                         if struct_level == 1:
                             mat_path = str(
-                                SchemaBuilder.one_nf_sqlite_path(DATA_DIR, db_id)
+                                SchemaBuilder.one_nf_sqlite_path(DATA_DIR, db_id, layout)
                             )
-                            if not SchemaBuilder.has_one_nf_database(DATA_DIR, db_id):
+                            if not SchemaBuilder.has_one_nf_database(
+                                DATA_DIR, db_id, layout
+                            ):
                                 raise FileNotFoundError(
                                     f"Missing 1NF DB for {db_id}: {mat_path}\n"
                                     f"Build: python3 -m preprocess_data.to_1nf.build_sqlite "
@@ -438,9 +702,11 @@ def run() -> None:
                             mat_rename = l1_rename_maps.get((db_id, sem_level))
                         else:
                             mat_path = str(
-                                SchemaBuilder.two_nf_sqlite_path(DATA_DIR, db_id)
+                                SchemaBuilder.two_nf_sqlite_path(DATA_DIR, db_id, layout)
                             )
-                            if not SchemaBuilder.has_two_nf_database(DATA_DIR, db_id):
+                            if not SchemaBuilder.has_two_nf_database(
+                                DATA_DIR, db_id, layout
+                            ):
                                 raise FileNotFoundError(
                                     f"Missing 2NF DB for {db_id}: {mat_path}\n"
                                     f"Build: python3 -m preprocess_data.to_2nf.build_sqlite "
@@ -529,10 +795,20 @@ def run() -> None:
 
     print(f"\n{'='*60}")
     print("Experiment complete.")
-    print(f"Results saved to: {RESULTS_DIR}/")
+    print(f"Results saved to: {active_results_dir}/")
     if overall_done > 0:
         print(f"Overall accuracy: {overall_correct}/{overall_done} = {overall_correct/overall_done:.1%}")
 
 
 if __name__ == "__main__":
-    run()
+    args = parse_args()
+    run(
+        spider_dir=args.spider_dir,
+        questions_path=args.questions,
+        results_dir=args.results_dir,
+        conditions=args.conditions,
+        models=args.models,
+        few_shot_n=args.few_shot,
+        cot=args.cot,
+        evidence=args.evidence,
+    )

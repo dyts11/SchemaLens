@@ -468,6 +468,27 @@ def _resolve_local_model_path(config: dict) -> str:
     return candidates[0]
 
 
+_LOCAL_8BIT_BY_DEFAULT = frozenset(
+    {
+        "qwen2.5-coder-7b-local",
+        "qwen2.5-coder-14b-local",
+        "qwen2.5-coder-32b-local",
+        "phi-4-local",
+        "olmo-2-13b-local",
+    }
+)
+
+
+def _local_load_in_8bit(model_name: str) -> bool:
+    """Use bitsandbytes 8-bit when env says so or for models that won't fit V100 16GB."""
+    env = os.environ.get("LOCAL_LOAD_IN_8BIT", "").strip().lower()
+    if env in ("1", "true", "yes"):
+        return True
+    if env in ("0", "false", "no"):
+        return False
+    return model_name in _LOCAL_8BIT_BY_DEFAULT
+
+
 def _get_local_model(model_name: str, config: dict):
     if model_name in _local_models:
         return _local_models[model_name]
@@ -481,24 +502,44 @@ def _get_local_model(model_name: str, config: dict):
         ) from e
 
     model_path = _resolve_local_model_path(config)
-    print(f"  [Local] Loading {model_name} from {model_path}", flush=True)
+    load_8bit = _local_load_in_8bit(model_name)
+    gpu_count = torch.cuda.device_count() if torch.cuda.is_available() else 0
+    print(
+        f"  [Local] Loading {model_name} from {model_path}"
+        f" (gpus={gpu_count}, 8bit={load_8bit})",
+        flush=True,
+    )
 
     tokenizer = AutoTokenizer.from_pretrained(
         model_path,
         trust_remote_code=True,
     )
-    if torch.cuda.is_available():
-        dtype = torch.float16
-        if hasattr(torch.cuda, "is_bf16_supported") and torch.cuda.is_bf16_supported():
-            dtype = torch.bfloat16
+    if load_8bit:
+        try:
+            from transformers import BitsAndBytesConfig
+        except ImportError as e:
+            raise ImportError(
+                "8-bit loading requires: pip install bitsandbytes"
+            ) from e
+        model = AutoModelForCausalLM.from_pretrained(
+            model_path,
+            quantization_config=BitsAndBytesConfig(load_in_8bit=True),
+            device_map="auto",
+            trust_remote_code=True,
+        )
     else:
-        dtype = torch.float32
-    model = AutoModelForCausalLM.from_pretrained(
-        model_path,
-        torch_dtype=dtype,
-        device_map="auto" if torch.cuda.is_available() else None,
-        trust_remote_code=True,
-    )
+        if torch.cuda.is_available():
+            dtype = torch.float16
+            if hasattr(torch.cuda, "is_bf16_supported") and torch.cuda.is_bf16_supported():
+                dtype = torch.bfloat16
+        else:
+            dtype = torch.float32
+        model = AutoModelForCausalLM.from_pretrained(
+            model_path,
+            torch_dtype=dtype,
+            device_map="auto" if torch.cuda.is_available() else None,
+            trust_remote_code=True,
+        )
     if not torch.cuda.is_available():
         model = model.to("cpu")
     model.eval()
@@ -540,15 +581,18 @@ def _call_local(model_name: str, config: dict, prompt: str) -> str:
     if pad_token_id is None:
         pad_token_id = tokenizer.eos_token_id
 
-    max_new_tokens = int(os.environ.get("LOCAL_MAX_NEW_TOKENS", "2048"))
+    max_new_tokens = int(os.environ.get("LOCAL_MAX_NEW_TOKENS", "512"))
     with torch.no_grad():
         output_ids = model.generate(
             **inputs,
             max_new_tokens=max_new_tokens,
             do_sample=False,
-            temperature=_TEMPERATURE,
             pad_token_id=pad_token_id,
         )
 
     new_tokens = output_ids[0, inputs["input_ids"].shape[1] :]
-    return tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
+    result = tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
+    del output_ids, inputs
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    return result

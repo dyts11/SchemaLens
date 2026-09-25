@@ -13,6 +13,9 @@ python-dotenv>=1.0.0
 openai>=1.40.0
 google-genai>=1.0.0
 
+# --- Sparse (BM25) retrieval few-shot (src/run_experiment_sparse.py) ---
+rank-bm25>=0.2.2
+
 # --- Analysis / plotting (analysis/plot_*.py, bootstrap_accuracy_ci.py) ---
 matplotlib>=3.8.0
 numpy>=1.24.0

@@ -1,8 +1,10 @@
 #!/bin/bash
-# GPU worker: runs rerun_db_experiment for one model.
+# GPU worker: BIRD few-shot experiment (3-shot, fixed per-DB examples).
+# 465 questions (33 reserved as examples) x 15 conditions (L1-L2,L4-L6 x S1-S3).
+# Submitted by slurm/submit_fewshot.sh
 #
-# Semantic levels for partial reruns are hardcoded below (MODEL -> levels).
-# Do not pass SEMANTIC_LEVELS via sbatch --export (commas/underscores break).
+# Conditions use run_experiment.py defaults (not passed via --export to avoid
+# the SLURM comma-in-export bug).
 
 #SBATCH --cpus-per-task=8
 
@@ -10,6 +12,8 @@ set -euo pipefail
 
 SCHEMA_EFFECT_ROOT="${SCHEMA_EFFECT_ROOT:-/group/pmc050/dsu/schema_effect}"
 CONFIG="${SCHEMA_EFFECT_ROOT}/slurm/config.env"
+RESULTS_DIR="${FEWSHOT_RESULTS_DIR:-results/fewshot}"
+FEW_SHOT_N="${FEW_SHOT_N:-3}"
 
 if [[ ! -f "$CONFIG" ]]; then
   echo "Missing ${CONFIG}" >&2
@@ -23,25 +27,11 @@ if [[ -z "${MODEL:-}" ]]; then
   exit 1
 fi
 
-# --- Hardcoded L1 semantic levels per model (european_football_2 partial reruns) ---
-declare -A RERUN_SEM_LEVELS=(
-  ["olmo-2-13b-local"]="2,3"
-  ["qwen2.5-coder-32b-local"]="2,3"
-  ["qwen2.5-coder-7b-local"]="3"
-)
-
-STRUCTURAL_LEVELS="1"
-if [[ -n "${RERUN_SEM_LEVELS[$MODEL]+x}" ]]; then
-  SEMANTIC_LEVELS="${RERUN_SEM_LEVELS[$MODEL]}"
-else
-  # Full reruns (all L1S1-S3) for models not listed above.
-  SEMANTIC_LEVELS="1,2,3"
-fi
-
 export LOCAL_MODELS_DIR
 export HF_HOME="${HF_HOME:-${LOCAL_MODELS_DIR}/.cache}"
 export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
 export LOCAL_MAX_NEW_TOKENS="${LOCAL_MAX_NEW_TOKENS:-512}"
+export LOCAL_LOAD_IN_8BIT="${LOCAL_LOAD_IN_8BIT:-0}"
 
 source "${VENV_DIR}/bin/activate"
 cd "${SCHEMA_EFFECT_ROOT}"
@@ -50,21 +40,22 @@ echo "Host: $(hostname)"
 echo "Date: $(date -Is)"
 echo "SLURM_JOB_ID=${SLURM_JOB_ID:-}"
 echo "MODEL=${MODEL}"
-echo "STRUCTURAL_LEVELS=${STRUCTURAL_LEVELS}"
-echo "SEMANTIC_LEVELS=${SEMANTIC_LEVELS}"
-echo "RERUN_DB_ID=${RERUN_DB_ID}"
+echo "FEW_SHOT_N=${FEW_SHOT_N}"
+echo "RESULTS_DIR=${SCHEMA_EFFECT_ROOT}/${RESULTS_DIR}"
+echo "Conditions: L1-L2,L4-L6 x S1-S3 (15, defaults in run_experiment.py)"
+echo "Questions: 465 (498 arcwise minus 33 reserved few-shot examples)"
 echo "SCHEMA_EFFECT_ROOT=${SCHEMA_EFFECT_ROOT}"
 echo "LOCAL_MODELS_DIR=${LOCAL_MODELS_DIR}"
-echo "LOCAL_LOAD_IN_8BIT=${LOCAL_LOAD_IN_8BIT:-}"
+echo "LOCAL_LOAD_IN_8BIT=${LOCAL_LOAD_IN_8BIT}"
 echo "LOCAL_MAX_NEW_TOKENS=${LOCAL_MAX_NEW_TOKENS}"
 echo "CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-}"
 nvidia-smi || true
 echo
 
-python -m src.rerun_db_experiment "${RERUN_DB_ID}" \
-  --models "${MODEL}" \
-  --structural-levels "${STRUCTURAL_LEVELS}" \
-  --semantic-levels "${SEMANTIC_LEVELS}"
+python -u run_experiment.py \
+  --results-dir "${RESULTS_DIR}" \
+  --few-shot "${FEW_SHOT_N}" \
+  --models "${MODEL}"
 
 echo
 echo "Finished ${MODEL} at $(date -Is)"

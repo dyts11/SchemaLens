@@ -209,6 +209,7 @@ def build_col_rename_map(
     db_id: str,
     data_dir: str,
     semantic_level: int,
+    tables_path: Optional[str] = None,
 ) -> Optional[Dict[str, List[Tuple[str, str]]]]:
     """
     Build a {table: [(original_col, mapped_col), ...]} mapping for the given
@@ -220,10 +221,15 @@ def build_col_rename_map(
 
     The caller passes this to evaluate() so the evaluator knows how to
     translate the LLM's SQL back to real column names.
+
+    ``tables_path`` overrides the default ``{data_dir}/dev_tables.json`` (e.g. a
+    Spider ``tables.json``).
     """
     from src.column_aliases import get_name as _alias
 
-    tables_path = Path(data_dir) / "dev_tables.json"
+    tables_path = (
+        Path(tables_path) if tables_path else Path(data_dir) / "dev_tables.json"
+    )
     with open(tables_path, encoding="utf-8") as f:
         all_entries = json.load(f)
     entry = next(t for t in all_entries if t["db_id"] == db_id)
@@ -264,6 +270,7 @@ def build_l1_col_rename_map(
     db_id: str,
     data_dir: str,
     semantic_level: int,
+    tables_path: Optional[str] = None,
 ) -> Optional[Dict[str, List[Tuple[str, str]]]]:
     """
     Column rename map for L1: physical names in ``{db_id}__1nf.sqlite`` (S3-style)
@@ -275,8 +282,11 @@ def build_l1_col_rename_map(
     from preprocess_data.to_1nf.convert import build_plan
     from src.schema_builder import L1_TABLE_NAME
 
-    phys = build_plan(db_id, data_dir, semantic_level=3).display_columns
-    disp = build_plan(db_id, data_dir, semantic_level=semantic_level).display_columns
+    tp = Path(tables_path) if tables_path else None
+    phys = build_plan(db_id, data_dir, semantic_level=3, tables_path=tp).display_columns
+    disp = build_plan(
+        db_id, data_dir, semantic_level=semantic_level, tables_path=tp
+    ).display_columns
     if phys == disp:
         return None
     return {L1_TABLE_NAME: list(zip(phys, disp))}
@@ -286,6 +296,7 @@ def build_l2_col_rename_map(
     db_id: str,
     data_dir: str,
     semantic_level: int,
+    tables_path: Optional[str] = None,
 ) -> Optional[Dict[str, List[Tuple[str, str]]]]:
     """
     Column rename map for L2: physical names in ``{db_id}__2nf.sqlite`` (built at S3)
@@ -299,8 +310,11 @@ def build_l2_col_rename_map(
     if db_id not in SPECS:
         return None
 
-    plan_phys = build_plan(db_id, data_dir, semantic_level=3)
-    plan_disp = build_plan(db_id, data_dir, semantic_level=semantic_level)
+    tp = Path(tables_path) if tables_path else None
+    plan_phys = build_plan(db_id, data_dir, semantic_level=3, tables_path=tp)
+    plan_disp = build_plan(
+        db_id, data_dir, semantic_level=semantic_level, tables_path=tp
+    )
 
     if len(plan_phys.clusters) != len(plan_disp.clusters):
         raise ValueError(f"2NF plan cluster count mismatch for db_id={db_id!r}")

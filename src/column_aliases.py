@@ -662,6 +662,107 @@ ALIASES: dict = {
         "VoteTypeId":           {"s2": "vote_type_id",  "s3": "vote_type_id"},
         "BountyAmount":         {"s2": "bounty_amt",    "s3": "bounty_amount"},
     },
+
+    # =========================================================================
+    # car_1 (Spider) — continents → countries → makers → models → specs
+    # Flat key per column name; wide-table prefixes (L1/L2) disambiguate tables.
+    # =========================================================================
+    "car_1": {
+        # continents
+        "ContId":       {"s2": "cont_id",     "s3": "continent_id"},
+        "Continent":    {"s2": "cont_nm",     "s3": "continent_name"},
+        # countries
+        "CountryId":    {"s2": "ctry_id",     "s3": "country_id"},
+        "CountryName":  {"s2": "ctry_nm",     "s3": "country_name"},
+        # car_makers
+        "Id":           {"s2": "rec_id",      "s3": "record_id"},
+        "Maker":        {"s2": "mkr_cd",      "s3": "maker_code"},
+        "FullName":     {"s2": "full_nm",     "s3": "manufacturer_full_name"},
+        "Country":      {"s2": "ctry_id",     "s3": "country_id"},
+        # model_list
+        "ModelId":      {"s2": "model_id",    "s3": "model_id"},
+        "Model":        {"s2": "model_nm",    "s3": "model_name"},
+        # car_names
+        "MakeId":       {"s2": "make_id",     "s3": "make_id"},
+        "Make":         {"s2": "make_lbl",    "s3": "make_label"},
+        # cars_data
+        "MPG":          {"s2": "mpg",         "s3": "miles_per_gallon"},
+        "Cylinders":    {"s2": "cyl",         "s3": "cylinder_count"},
+        "Edispl":       {"s2": "displ",       "s3": "engine_displacement"},
+        "Horsepower":   {"s2": "hp",          "s3": "horsepower"},
+        "Weight":       {"s2": "wt",          "s3": "vehicle_weight"},
+        "Accelerate":   {"s2": "accel",       "s3": "acceleration"},
+        "Year":         {"s2": "model_yr",    "s3": "model_year"},
+    },
+
+    # =========================================================================
+    # tvshow (Spider) — TV_Channel hub; TV_series and Cartoon sibling facts
+    # =========================================================================
+    "tvshow": {
+        # shared across tables
+        "id":                       {"s2": "rec_id",    "s3": "record_id"},
+        "Channel":                  {"s2": "ch_id",     "s3": "channel_id"},
+        # TV_Channel
+        "series_name":              {"s2": "series_nm", "s3": "series_name"},
+        "Country":                  {"s2": "ctry",      "s3": "country"},
+        "Language":                 {"s2": "lang",      "s3": "language"},
+        "Content":                  {"s2": "content",   "s3": "content_type"},
+        "Pixel_aspect_ratio_PAR":   {"s2": "par",       "s3": "pixel_aspect_ratio"},
+        "Hight_definition_TV":      {"s2": "hdtv",      "s3": "high_definition_tv"},
+        "Pay_per_view_PPV":         {"s2": "ppv",       "s3": "pay_per_view"},
+        "Package_Option":           {"s2": "pkg_opt",   "s3": "package_option"},
+        # TV_series
+        "Episode":                  {"s2": "episode",   "s3": "episode_title"},
+        "Air_Date":                 {"s2": "air_dt",    "s3": "air_date"},
+        "Rating":                   {"s2": "rating",    "s3": "rating"},
+        "Share":                    {"s2": "share",     "s3": "audience_share"},
+        "18_49_Rating_Share":       {"s2": "rtg_18_49", "s3": "age_18_49_rating_share"},
+        "Viewers_m":                {"s2": "viewers_m", "s3": "viewers_millions"},
+        "Weekly_Rank":              {"s2": "wk_rank",   "s3": "weekly_rank"},
+        # Cartoon
+        "Title":                    {"s2": "title",     "s3": "cartoon_title"},
+        "Directed_by":              {"s2": "director",  "s3": "directed_by"},
+        "Written_by":               {"s2": "writer",    "s3": "written_by"},
+        "Original_air_date":        {"s2": "orig_air",  "s3": "original_air_date"},
+        "Production_code":          {"s2": "prod_cd",   "s3": "production_code"},
+    },
+
+    # =========================================================================
+    # wamex (Acuity held-out) — wamex_reports hub; satellites keyed on anumber
+    # =========================================================================
+    # original names are full words run together (≈ S3 without separators);
+    # S3 adds word breaks and disambiguates bare storages columns. "id" falls back.
+    # =========================================================================
+    "wamex": {
+        # shared across tables
+        "anumber":                  {"s2": "a_no",          "s3": "report_number"},
+        # wamex_reports
+        "reporttitle":              {"s2": "rpt_title",     "s3": "report_title"},
+        "reportdate":               {"s2": "rpt_dt",        "s3": "report_date"},
+        "authorids":                {"s2": "auth_ids",      "s3": "author_ids"},
+        "authornames":              {"s2": "auth_nms",      "s3": "author_names"},
+        "operatorids":              {"s2": "oper_ids",      "s3": "operator_ids"},
+        "operators":                {"s2": "oper_nms",      "s3": "operator_names"},
+        "projectname":              {"s2": "proj_nm",       "s3": "project_name"},
+        "targetcommoditiesids":     {"s2": "tgt_cmdty_ids", "s3": "target_commodity_ids"},
+        "targetcommoditiesnames":   {"s2": "tgt_cmdty_nms", "s3": "target_commodity_names"},
+        "keywords":                 {"s2": "kwds",          "s3": "keywords"},
+        "confidentiality":          {"s2": "conf",          "s3": "confidentiality_status"},
+        # abstracts
+        "abstract":                 {"s2": "abstr",         "s3": "abstract_text"},
+        # storages
+        "volume":                   {"s2": "vol",           "s3": "volume_number"},
+        "storage":                  {"s2": "stor_type",     "s3": "storage_type"},
+        "number":                   {"s2": "stor_no",       "s3": "storage_location_number"},
+        "description":              {"s2": "descr",         "s3": "storage_description"},
+        # drilling_summaries
+        "holetype":                 {"s2": "hole_type",     "s3": "drill_hole_type"},
+        "numberofholes":            {"s2": "num_holes",     "s3": "number_of_holes"},
+        "totaldrilled":             {"s2": "tot_drld",      "s3": "total_metres_drilled"},
+        # geo_chemistry
+        "sampletype":               {"s2": "smpl_type",     "s3": "sample_type"},
+        "numberofsamples":          {"s2": "num_smpls",     "s3": "number_of_samples"},
+    },
 }
 
 
