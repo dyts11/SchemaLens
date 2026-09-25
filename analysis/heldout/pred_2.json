@@ -1,0 +1,352 @@
+{
+ "5": {
+  "category": "Schema linking",
+  "subtype": "wrong column",
+  "reason": "s.school_name misattributed to the schools alias; school_name (sname) belongs to the already-joined satscores; also Virtual='Yes' instead of 'F'"
+ },
+ "23": {
+  "category": "Predicate error",
+  "subtype": "Predicate semantic error",
+  "reason": "wraps the enrollment difference in ABS() (gold is a signed K-12 minus Ages 5-17 > 30); also adds City/State/Zip columns and drops School IS NOT NULL"
+ },
+ "24": {
+  "category": "Schema linking",
+  "subtype": "wrong column",
+  "reason": "precomputed percent_eligible_free_k12 substituted for gold's Free Meal Count (K-12)/Enrollment (K-12) ratio; also drops rtype='S' and adds DISTINCT"
+ },
+ "37": {
+  "category": "Schema linking",
+  "subtype": "wrong table",
+  "reason": "ranks schools by frpm.percent_eligible_free_or_reduced_price_meal_k12 instead of satscores NumGE1500/NumTstTakr excellence rate - satscores replaced by frpm and a different attribute"
+ },
+ "77": {
+  "category": "Schema linking",
+  "subtype": "wrong column",
+  "reason": "percent_eligible_free_ages_5_17 (Free, precomputed, no *100) instead of FRPM Count (Ages 5-17)*100/Enrollment; grade_span_offered instead of GSserved (grade_span_served); also 'Kindergarten to 9th grade' instead of 'K-9'"
+ },
+ "82": {
+  "category": "Predicate error",
+  "subtype": "Predicate semantic error",
+  "reason": "ORDER BY Longitude DESC drops gold's ABS(longitude) transformation"
+ },
+ "87": {
+  "category": "Schema linking",
+  "subtype": "wrong column",
+  "reason": "instruction_level_name IN (...) substituted for gold's DOC=54 AND SOC=62 code columns; also City='San Bernardino City Unified' instead of 'San Bernardino'"
+ },
+ "89": {
+  "category": "Schema linking",
+  "subtype": "wrong column",
+  "reason": "replaces account.frequency='POPLATEK PO OBRATU' with trans.type='issuance' via an extra trans join; also 'East Bohemia' case differs from 'east Bohemia'"
+ },
+ "93": {
+  "category": "Predicate error",
+  "subtype": "Filter value error",
+  "reason": "region='North Bohemia' (case) doesn't match stored 'north Bohemia'; structure otherwise matches gold"
+ },
+ "98": {
+  "category": "Predicate error",
+  "subtype": "Predicate semantic error",
+  "reason": "adds an extra status='A' condition gold doesn't have; also statement_frequency='weekly' instead of stored 'POPLATEK TYDNE'"
+ },
+ "115": {
+  "category": "JOIN errors",
+  "subtype": "extra table",
+  "reason": "reaches district through disp/account (account's district) instead of client.district_id directly, changing grain; also drops GROUP BY A4 and 'South Bohemia' case differs"
+ },
+ "173": {
+  "category": "Schema linking",
+  "subtype": "wrong table",
+  "reason": "queries trans (amount=3539) instead of gold's order table grouped by account_id/k_symbol with SUM(amount)=3539; selects SUM(amount) instead of k_symbol"
+ },
+ "192": {
+  "category": "Predicate error",
+  "subtype": "Filter value error",
+  "reason": "status='A' instead of IN ('C','D') and statement_frequency='A' instead of 'POPLATEK PO OBRATU' - only literals differ"
+ },
+ "200": {
+  "category": "Schema linking",
+  "subtype": "wrong column",
+  "reason": "selects molecule.label instead of gold's molecule_id; also 'triple' instead of '#' and LIKE '%carcinogenic%' instead of label='+'"
+ },
+ "201": {
+  "category": "Predicate error",
+  "subtype": "Filter value error",
+  "reason": "element='C' and bond_type='double' instead of stored 'c' and '='; also COUNT(*) instead of COUNT(DISTINCT atom_id)"
+ },
+ "236": {
+  "category": "Schema linking",
+  "subtype": "wrong column",
+  "reason": "filters molecule.label='TR001_6_9' (via extra molecule join) instead of connected.bond_id='TR001_6_9' on the already-joined connected table"
+ },
+ "240": {
+  "category": "Schema linking",
+  "subtype": "wrong column",
+  "reason": "filters molecule.label='TR004' via an unnecessary join instead of gold's atom.molecule_id='TR004'"
+ },
+ "242": {
+  "category": "Schema linking",
+  "subtype": "wrong column",
+  "reason": "selects molecule.label instead of gold's molecule_id; also numeric atom_id BETWEEN 21 AND 25 instead of SUBSTR(atom_id,-2) and drops label='+'"
+ },
+ "255": {
+  "category": "JOIN errors",
+  "subtype": "missing table",
+  "reason": "omits the molecule join and the label='+' numerator entirely, computing share of 'single' bonds over all bonds instead of share of carcinogenic molecules among single bonds"
+ },
+ "263": {
+  "category": "Predicate error",
+  "subtype": "Predicate semantic error",
+  "reason": "element='chlorine'/bond_type='single' instead of 'cl'/'-' and replaces gold's molecule_id IN (subquery) with a row-multiplying atom-bond join"
+ },
+ "273": {
+  "category": "Predicate error",
+  "subtype": "Filter value error",
+  "reason": "element='chlorine' and label LIKE '%carcinogenic%' instead of stored 'cl' and '+'; structure otherwise matches gold"
+ },
+ "282": {
+  "category": "Predicate error",
+  "subtype": "Filter value error",
+  "reason": "element='H' instead of stored 'h'; the dropped CTE/GROUP BY label are vestigial for a single molecule"
+ },
+ "724": {
+  "category": "Predicate error",
+  "subtype": "Filter value error",
+  "reason": "colour='blue'/'blond' (case) don't match stored 'Blue'/'Blond'"
+ },
+ "733": {
+  "category": "Predicate error",
+  "subtype": "Filter value error",
+  "reason": "colour='gold' (case) doesn't match stored 'Gold'"
+ },
+ "750": {
+  "category": "Predicate error",
+  "subtype": "Predicate semantic error",
+  "reason": "drops the weight_kg > 0 filter, including zero/placeholder weights in the average"
+ },
+ "772": {
+  "category": "Schema linking",
+  "subtype": "wrong column",
+  "reason": "h.hair_colour_id referenced on a colour alias; hair_colour_id belongs to the already-joined superhero table; also selects colour names instead of gold's id columns"
+ },
+ "794": {
+  "category": "Nesting problem",
+  "subtype": "wrong sub-query",
+  "reason": "collapses gold's tie-preserving attribute_value = (SELECT MAX ...) into ORDER BY attribute_value DESC LIMIT 1 inside the subquery, dropping ties"
+ },
+ "829": {
+  "category": "Predicate error",
+  "subtype": "Filter value error",
+  "reason": "publisher_name='DC' instead of stored 'DC Comics', so the DC count is zero; also drops the publisher-name output column"
+ },
+ "850": {
+  "category": "Other",
+  "subtype": "missing/redundant DISTINCT",
+  "reason": "missing DISTINCT, otherwise identical to gold"
+ },
+ "861": {
+  "category": "Predicate error",
+  "subtype": "Predicate semantic error",
+  "reason": "qualifying_3_time = '0:01:54' (wrong format, exact match) instead of gold's LIKE '1:54%' pattern; also takes number from qualifying rather than drivers"
+ },
+ "865": {
+  "category": "Predicate error",
+  "subtype": "Predicate semantic error",
+  "reason": "filters position IS NOT NULL instead of gold's time IS NOT NULL (different finish condition); also drops dob IS NOT NULL"
+ },
+ "866": {
+  "category": "Predicate error",
+  "subtype": "Predicate semantic error",
+  "reason": "lt.time = '0:01:27' (wrong format, exact match) instead of gold's LIKE '1:27%'; also missing DISTINCT"
+ },
+ "881": {
+  "category": "GROUP BY errors",
+  "subtype": "wrong column",
+  "reason": "introduces GROUP BY driver_id with per-driver names where gold returns a single scalar completion percentage; also drops the time IS NOT NULL numerator condition"
+ },
+ "904": {
+  "category": "Schema linking",
+  "subtype": "wrong table",
+  "reason": "substitutes results.fastest_lap_time for gold's lapTimes.milliseconds - results replaces lapTimes"
+ },
+ "915": {
+  "category": "Schema linking",
+  "subtype": "wrong table",
+  "reason": "selects circuits.country via a nonsensical circuits join instead of gold's single-table drivers.nationality; date_of_birth referenced in a results-scope subquery"
+ },
+ "944": {
+  "category": "Schema linking",
+  "subtype": "wrong column",
+  "reason": "uses results.position (NULL for non-finishers) instead of gold's positionOrder, with last place derived from COUNT(*); also inverts the (last-first)/last formula"
+ },
+ "959": {
+  "category": "JOIN errors",
+  "subtype": "missing table",
+  "reason": "year lives on races, which predicted never joins (references driverStandings.year instead); also collapses to MAX(fastest_lap_number) with position=1"
+ },
+ "981": {
+  "category": "Predicate error",
+  "subtype": "Predicate semantic error",
+  "reason": "subquery selects date_of_birth = MIN(...) (oldest driver) instead of gold's ORDER BY dob DESC LIMIT 1 (youngest); also MIN(year) aggregate with bare columns instead of ORDER BY date LIMIT 1"
+ },
+ "1037": {
+  "category": "Other",
+  "subtype": "missing/redundant DISTINCT",
+  "reason": "SUM(CASE)/COUNT(*) over Player_Attributes rows instead of gold's COUNT(DISTINCT player id) ratio - not deduped per player"
+ },
+ "1098": {
+  "category": "Schema linking",
+  "subtype": "wrong column",
+  "reason": "filters team_short_name='Ajax' instead of gold's team_long_name='Ajax'"
+ },
+ "1110": {
+  "category": "Predicate error",
+  "subtype": "Predicate semantic error",
+  "reason": "uses exact date='2010-02-22' instead of gold's LIKE '2010-02-22%' pattern"
+ },
+ "1114": {
+  "category": "JOIN errors",
+  "subtype": "wrong column (key)",
+  "reason": "joins Player_Attributes to Player via player_api_id instead of gold's player_fifa_api_id; also date BETWEEN without SUBSTR(date,1,10) excludes the upper-bound day"
+ },
+ "1116": {
+  "category": "Nesting problem",
+  "subtype": "wrong sub-query",
+  "reason": "replaces gold's DENSE_RANK() OVER (ORDER BY height DESC) = 1 window subquery with ORDER BY height DESC LIMIT 10"
+ },
+ "1136": {
+  "category": "Predicate error",
+  "subtype": "Predicate semantic error",
+  "reason": "adds an extra attacking_work_rate='High' condition gold doesn't have; also 'Left' case and COUNT(*) instead of COUNT(DISTINCT player_api_id)"
+ },
+ "1144": {
+  "category": "Nesting problem",
+  "subtype": "wrong sub-query",
+  "reason": "replaces gold's player_api_id IN (SELECT ... weight = MAX(weight)) with a join ORDER BY weight DESC LIMIT 1, returning one row instead of all attribute rows of the heaviest player(s)"
+ },
+ "1147": {
+  "category": "Schema linking",
+  "subtype": "wrong column",
+  "reason": "subquery ranks by strength instead of gold's overall_rating"
+ },
+ "1155": {
+  "category": "Predicate error",
+  "subtype": "Filter value error",
+  "reason": "lactate_dehydrogenase > 175 instead of gold's > 500; also missing DISTINCT"
+ },
+ "1168": {
+  "category": "Schema linking",
+  "subtype": "wrong column",
+  "reason": "selects MAX(Patient.first_record_date) instead of gold's Laboratory.Date and computes current age instead of age at First Date"
+ },
+ "1171": {
+  "category": "Predicate error",
+  "subtype": "Filter value error",
+  "reason": "age threshold < 0 instead of gold's < 18; also COUNT(DISTINCT ID) instead of COUNT(ID)"
+ },
+ "1179": {
+  "category": "Other",
+  "subtype": "SELECT-list shape",
+  "reason": "selects three aCL columns (IgG, IgM, IgA) where gold returns only aCL IgM; filters otherwise match gold"
+ },
+ "1189": {
+  "category": "Predicate error",
+  "subtype": "Predicate semantic error",
+  "reason": "AVG subquery drops the Thrombosis=2 AND ANA Pattern='S' population restriction, averaging over all Examination rows; also adds a vestigial Patient join"
+ },
+ "1209": {
+  "category": "Predicate error",
+  "subtype": "Filter value error",
+  "reason": "alanine_aminotransferase > 40 instead of gold's > 60; also missing DISTINCT"
+ },
+ "1220": {
+  "category": "Predicate error",
+  "subtype": "Filter value error",
+  "reason": "urea_nitrogen = 15 instead of gold's UN = 29"
+ },
+ "1229": {
+  "category": "Predicate error",
+  "subtype": "Filter value error",
+  "reason": "triglyceride > 150 instead of gold's >= 200"
+ },
+ "1232": {
+  "category": "Predicate error",
+  "subtype": "Predicate semantic error",
+  "reason": "replaces GLU >= 180 AND T-CHO < 250 with a two-sided glucose (<70 OR >110) and cholesterol BETWEEN 150-200 range, with OR/AND precedence unparenthesised"
+ },
+ "1239": {
+  "category": "Predicate error",
+  "subtype": "Predicate semantic error",
+  "reason": "replaces HCT >= 52 with a two-sided 45 < hematocrit < 50 range; the flattened GROUP BY/HAVING is equivalent to gold's IN subquery"
+ },
+ "1243": {
+  "category": "Predicate error",
+  "subtype": "Filter value error",
+  "reason": "sex='female' instead of 'F' and prothrombin_time > 13.5 instead of >= 14; also COUNT(*) over rows instead of COUNT(DISTINCT ID)"
+ },
+ "1252": {
+  "category": "Predicate error",
+  "subtype": "Filter value error",
+  "reason": "immunoglobulin_g = 'normal' instead of gold's numeric BETWEEN 900 AND 2000 range"
+ },
+ "1322": {
+  "category": "Predicate error",
+  "subtype": "Filter value error",
+  "reason": "type='meeting' (case) doesn't match stored 'Meeting'; the IN-subquery GROUP BY/HAVING is equivalent to gold"
+ },
+ "1334": {
+  "category": "Predicate error",
+  "subtype": "Predicate semantic error",
+  "reason": "adds an extra, invalid member.position='Student_Club' condition gold doesn't have"
+ },
+ "1344": {
+  "category": "Schema linking",
+  "subtype": "wrong table",
+  "reason": "queries event (event_date/type='fundraising') instead of gold's income (date_received/source='Fundraising')"
+ },
+ "1392": {
+  "category": "GROUP BY errors",
+  "subtype": "wrong column",
+  "reason": "introduces GROUP BY income_source ordered by SUM(amount) instead of gold's plain ORDER BY source DESC LIMIT 1 with no aggregation"
+ },
+ "1398": {
+  "category": "Predicate error",
+  "subtype": "Filter value error",
+  "reason": "category='advertisement' (case) doesn't match stored 'Advertisement'"
+ },
+ "1427": {
+  "category": "Predicate error",
+  "subtype": "Filter value error",
+  "reason": "type='guest speaker' (case) doesn't match stored 'Guest Speaker'; also missing DISTINCT"
+ },
+ "1473": {
+  "category": "Predicate error",
+  "subtype": "Predicate semantic error",
+  "reason": "strftime('%Y', date) misapplied to 'YYYYMM' text returns NULL, matching zero rows; also averages raw rows instead of gold's per-customer SUM subquery /12"
+ },
+ "1479": {
+  "category": "Predicate error",
+  "subtype": "Predicate semantic error",
+  "reason": "strftime('%Y', date) misapplied to 'YYYYMM' text returns NULL for every row, unlike gold's SUBSTR(Date,1,4)"
+ },
+ "1493": {
+  "category": "Predicate error",
+  "subtype": "Predicate semantic error",
+  "reason": "date BETWEEN ISO-hyphenated bounds against Date stored as 'YYYYMM' text instead of gold's Date='201202'"
+ },
+ "1524": {
+  "category": "Schema linking",
+  "subtype": "wrong table",
+  "reason": "joins customers (c.country) instead of gasstations - Country only exists on gasstations; also amount=548.4 instead of price=548.4"
+ },
+ "1525": {
+  "category": "Other",
+  "subtype": "missing/redundant DISTINCT",
+  "reason": "SUM(CASE)/COUNT(*) over transaction rows instead of gold's COUNT(DISTINCT customer) ratio"
+ },
+ "1531": {
+  "category": "Other",
+  "subtype": "wrong aggregate function or scaling",
+  "reason": "AVG(price) instead of gold's weighted SUM(price*amount)/SUM(amount); also ranks customers by SUM(amount) instead of SUM(amount*price)"
+ }
+}

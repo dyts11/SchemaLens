@@ -1,0 +1,285 @@
+question_id,db_id,difficulty,question_type,category,subtype,reason
+5,california_schools,simple,aggregate,Schema linking,wrong column,school_name misattributed to schools alias s; belongs to the already-joined satscores (ss); also Virtual value wrong ('Yes' vs 'F')
+11,california_schools,simple,retrieval,JOIN errors,missing table,omits the schools join needed for the 'School is not NULL' filter; also drops the '+ Enrollment (Ages 5-17)' term
+12,california_schools,moderate,aggregate,Schema linking,wrong column,divides NumGE1500 by enrollment_grade_12 instead of number_test_takers in the WHERE ratio; also swaps SELECT to a precomputed percent column and drops rtype/enrollment filters
+17,california_schools,simple,retrieval,JOIN errors,missing table,charter_number lives on schools; predicted queries satscores alone
+23,california_schools,moderate,retrieval,Predicate error,Predicate semantic error,adds ABS() around the enrollment difference that gold doesn't have
+24,california_schools,moderate,retrieval,Predicate error,Predicate semantic error,missing rtype='S' filter
+25,california_schools,moderate,aggregate,Nesting problem,HAVING clause mismatch,"gold's per-group HAVING AVG(AvgScrMath)>400 (with GROUP BY sname,FundingType) collapsed to a flat per-row WHERE filter with no GROUP BY"
+26,california_schools,moderate,retrieval,Schema linking,wrong column,uses percent_eligible_free_or_reduced_price_meal_ages_5_17 (a percentage) where gold compares the raw FRPM Count Ages 5-17; also instruction_level_name substituted for school_type
+27,california_schools,moderate,retrieval,Schema linking,wrong column,school_name misattributed to schools alias; belongs to the already-joined satscores
+28,california_schools,challenging,aggregate,Predicate error,Filter value error,'Locally Funded' (case) vs gold's 'Locally funded'
+31,california_schools,moderate,retrieval,JOIN errors,missing table,missing join to schools for the 'School is not null' filter
+32,california_schools,moderate,retrieval,JOIN errors,missing table,school_ownership_code (SOC) lives on schools; predicted queries frpm alone
+36,california_schools,challenging,retrieval,Predicate error,Predicate semantic error,missing rtype='S' filter
+37,california_schools,moderate,retrieval,Schema linking,wrong table,substitutes frpm's percent_eligible_free_or_reduced_price_meal_k12 subquery for gold's satscores NumGE1500/NumTstTakr MIN-ratio subquery
+40,california_schools,moderate,retrieval,Predicate error,Predicate semantic error,drops rtype='S' and AvgScrRead IS NOT NULL filters; adds a redundant County='Fresno' condition
+41,california_schools,simple,retrieval,Nesting problem,wrong sub-query,replaces gold's RANK() OVER (PARTITION BY county ORDER BY AvgScrRead DESC) window function with a GROUP BY/IN approximation; also wrong Virtual value
+46,california_schools,simple,retrieval,Schema linking,wrong column,filters educational_option_name='Special' instead of gold's district_ownership_code=31; also adds an unneeded GROUP BY/MAX aggregation
+47,california_schools,moderate,aggregate,Invalid SQL,Other execution error,AVG(COUNT(*)) nested aggregate misuse
+48,california_schools,moderate,aggregate,Schema linking,wrong table,queries frpm (district_type/county_name) instead of schools (DOC/DOCType/StatusType/County); also collapses gold's two independent COUNT(*) subqueries into one CASE-based aggregate
+50,california_schools,simple,retrieval,Predicate error,Predicate semantic error,drops rtype='S' and AvgScrMath IS NOT NULL filters
+62,california_schools,challenging,aggregate,Other,wrong aggregate function or scaling,uses precomputed percent_eligible_free_k12 without gold's *100 scaling on the Free Meal Count/Enrollment ratio
+72,california_schools,moderate,retrieval,JOIN errors,missing table,EdOpsCode/City live on schools; predicted queries frpm alone with wrong county_name/school_name substitutes
+77,california_schools,moderate,retrieval,Schema linking,wrong column,grade_span_offered used instead of grade_span_served for the GSserved='K-9' filter
+79,california_schools,moderate,aggregate,Schema linking,wrong column,county_name (belongs to frpm/satscores) used directly on schools with no join present
+82,california_schools,simple,retrieval,Predicate error,Predicate semantic error,"missing ABS() around longitude, reversing which extreme is picked"
+83,california_schools,challenging,aggregate,JOIN errors,missing table,NSLP Provision Status lives on frpm; predicted queries schools alone substituting educational_option_name
+85,california_schools,moderate,retrieval,Schema linking,wrong column,precomputed percent_eligible_free_k12 substituted for gold's manually-scaled Free Meal Count K12*100/Enrollment K12 ratio; WHERE filter itself matches gold exactly
+87,california_schools,challenging,retrieval,Schema linking,wrong column,replaces SOC=62 (school_ownership_code) with instruction_level_name OR conditions; also drops DOC=54 filter and uses wrong City value
+89,financial,moderate,aggregate,JOIN errors,extra table,joins in `trans` (not needed) and filters on trans.type='issuance' instead of gold's account.frequency='POPLATEK PO OBRATU'; also 'East Bohemia' case differs
+93,financial,moderate,aggregate,Predicate error,Filter value error,'North Bohemia' (case) doesn't match gold's stored 'north Bohemia'
+94,financial,challenging,aggregate,Nesting problem,wrong sub-query,replaces gold's independent scalar subquery (MAX(A11)-MIN(A11) over ALL districts) with an aggregate MAX/MIN over districts of only female clients; also fails to first narrow to the single oldest female client before joining
+95,financial,moderate,aggregate,Nesting problem,wrong sub-query,omits gold's subquery pinning to the single (youngest) client via ORDER BY birth_date DESC LIMIT 1; instead sorts the full joined set by birth_date ASC (wrong direction) with average_salary as a tiebreak
+98,financial,moderate,retrieval,Predicate error,Predicate semantic error,adds an extra l.status='A' condition gold doesn't have; also translates frequency to English 'weekly' instead of the stored Czech value 'POPLATEK TYDNE'
+99,financial,moderate,retrieval,GROUP BY errors,wrong column,"introduces GROUP BY account_id and drops the LIMIT 1, returning all qualifying accounts instead of the single top loan amount"
+112,financial,simple,retrieval,JOIN errors,missing table,"district_name lives on district, which predicted never joins (aliases disp as 'd' and mistakenly references district_name through it)"
+115,financial,challenging,aggregate,JOIN errors,extra table,"joins disp+account (unneeded), which can multiply client rows in the percentage calculation; also drops the GROUP BY A4/ORDER BY A4 DESC LIMIT 1 logic, computing over all South Bohemia clients at once"
+116,financial,challenging,aggregate,Other,wrong aggregate function or scaling,"computes (MAX(balance)-MIN(balance))/MIN(balance) over the whole date range instead of gold's SUM(IIF(date=exact_date,balance,0)) at two specific dates; also adds unneeded client/disp joins"
+118,financial,moderate,aggregate,Predicate error,Filter value error,status='A' instead of gold's status='C'
+125,financial,challenging,retrieval,Predicate error,Predicate semantic error,computes a plain difference (rate_1996 - rate_1995) instead of gold's percentage-change formula; also wrong status value ('A' vs 'D') and substitutes loan.amount>0 for district.A12 IS NOT NULL/A12>0
+129,financial,moderate,retrieval,GROUP BY errors,wrong column,"introduces GROUP BY district_name + SUM(amount) ranking (highest total amount) instead of gold's simple ORDER BY per-transaction ranking, no aggregation; also translates type to English 'withdrawal' instead of the stored code 'VYDAJ'"
+136,financial,moderate,aggregate,Predicate error,Predicate semantic error,adds an extra status='A' condition gold doesn't have; also uses 'M' instead of the actual stored value 'POPLATEK MESICNE'
+137,financial,moderate,aggregate,JOIN errors,missing table,"entirely omits the loan join and status IN ('C','D') filter, counting all accounts in district 1 instead of just those with a completed/defaulted loan"
+145,financial,moderate,aggregate,JOIN errors,wrong column (key),"joins card via a nonexistent c.account_id; card only has disp_id, requiring a join through disp to reach account_id; also substitutes operation='VYBER KARTOU' with card.type='credit'"
+149,financial,challenging,retrieval,Schema linking,wrong table,replaces disp.type entirely with an unrelated 'account NOT IN loan' condition and selects statement_frequency/average_salary instead of disp.type
+152,financial,moderate,aggregate,Schema linking,wrong column,filters number_inhabitants>4000 instead of gold's A15 (number_crimes_1995)>4000; also replaces gold's DISTINCT-subquery join with a raw JOIN that could duplicate district rows
+159,financial,simple,retrieval,Predicate error,Predicate semantic error,adds an extra t.type='withdrawal' condition not in gold; uses transaction_operation='cash' instead of the stored Czech code 'VYBER'; also selects only 3 columns instead of all trans.* columns
+169,financial,challenging,aggregate,Predicate error,Predicate semantic error,"drops the disp.type='OWNER' filter entirely, including all disponents not just account owners"
+173,financial,challenging,aggregate,Schema linking,wrong table,"queries `trans` (realized transactions) instead of gold's `""order""` (standing orders) table; also drops the k_symbol/SUM/GROUP BY subquery structure"
+186,financial,moderate,aggregate,Predicate error,Predicate semantic error,"swaps which condition is the WHERE-filter vs. the CASE-numerator - filters WHERE gender='M' and counts weekly-frequency within that population, inverting gold's structure"
+192,financial,moderate,aggregate,Predicate error,Filter value error,"status='A' instead of IN ('C','D'); statement_frequency='A' (an invalid value) instead of 'POPLATEK PO OBRATU'"
+194,financial,moderate,retrieval,JOIN errors,wrong column (key),joins card via a nonexistent ca.account_id (card only has disp_id); also 'High level' is not a valid card type value (gold's actual value is 'gold')
+197,toxicology,moderate,aggregate,Predicate error,Predicate semantic error,restructures gold's molecule-level oxygen-count/single-bond-molecule CTEs into an atom-bond-connected join that only counts oxygen atoms directly involved in a single bond; also uses 'O'/'single' instead of 'o'/'-'
+198,toxicology,challenging,aggregate,Invalid SQL,Other execution error,AVG(COUNT(bond_id)) nested aggregate misuse
+200,toxicology,simple,retrieval,Schema linking,wrong column,selects molecule.label instead of gold's molecule_id; also uses 'triple'/'%carcinogenic%' instead of the stored codes '#'/'+'
+201,toxicology,moderate,aggregate,Predicate error,Filter value error,bond_type='double' instead of gold's '='
+206,toxicology,challenging,retrieval,Schema linking,wrong table,substitutes molecule.label='TR004_8_9' for gold's connected.bond_id='TR004_8_9' - connected is dropped entirely
+207,toxicology,challenging,retrieval,Predicate error,Filter value error,bond_type='double' instead of gold's '=' - structure otherwise matches gold exactly
+208,toxicology,moderate,aggregate,Predicate error,Filter value error,element='H' instead of gold's 'h' - structure otherwise matches gold exactly
+212,toxicology,challenging,aggregate,Nesting problem,HAVING clause mismatch,collapses gold's GROUP BY element HAVING COUNT(*) = (SELECT MIN(cnt)...) tie-preserving structure to ORDER BY COUNT(*) ASC LIMIT 1
+213,toxicology,moderate,retrieval,Schema linking,wrong column,treats 'TR004_8'/'TR004_20' as values to look up via atom.element instead of using connected.atom_id/atom_id2 directly; also drops the symmetric OR condition
+215,toxicology,challenging,aggregate,Predicate error,Predicate semantic error,both iodine_count and sulfur_count use the identical COUNT(*) expression instead of gold's element-specific COUNT(DISTINCT CASE...); also uses 'I'/'S'/'single' instead of 'i'/'s'/'-'
+218,toxicology,challenging,aggregate,Predicate error,Predicate semantic error,computes the percentage over individual atom rows instead of gold's DISTINCT molecule_id-level check of whether a molecule contains any fluorine atom; also 'carcinogenic'/'F' instead of '+'/'f'
+219,toxicology,challenging,aggregate,Predicate error,Predicate semantic error,"inverts which condition is the WHERE-filter vs the CASE-measured condition - filters WHERE label='carcinogenic' and counts triple-bond rows, instead of gold's WHERE bond_type='#' restricting to triple-bond molecules"
+220,toxicology,challenging,retrieval,Schema linking,wrong column,filters molecule.label='TR000' (via an unnecessary join) instead of gold's atom.molecule_id='TR000' directly
+226,toxicology,moderate,aggregate,Schema linking,wrong column,filters molecule.label='TR008' instead of gold's bond.molecule_id='TR008'; also 'double' instead of '='
+227,toxicology,simple,aggregate,Predicate error,Filter value error,label='carcinogenic' instead of gold's '+'
+228,toxicology,moderate,aggregate,Schema linking,wrong column,filters molecule.label='TR206' instead of gold's atom.molecule_id='TR206'; also element='H' instead of 'h'
+230,toxicology,challenging,retrieval,Schema linking,wrong column,filters molecule.label='TR060' instead of gold's molecule_id='TR060'
+231,toxicology,challenging,aggregate,Schema linking,wrong column,filters molecule.label='TR010' instead of gold's bond.molecule_id='TR010'
+232,toxicology,moderate,retrieval,Schema linking,wrong column,"selects molecule.label instead of gold's molecule_id; also 'single' instead of '-', and NOT LIKE '%carcinogenic%' instead of label='-'"
+234,toxicology,moderate,aggregate,Schema linking,wrong column,"splits the compound atom_id 'TR009_12' into molecule.label='TR009' + numeric connected.atom_id=12, instead of directly matching connected.atom_id='TR009_12' as a string"
+236,toxicology,moderate,retrieval,Schema linking,wrong column,filters molecule.label='TR001_6_9' instead of gold's connected.bond_id='TR001_6_9'
+239,toxicology,simple,aggregate,Predicate error,Predicate semantic error,"uses atom_id=19 (a bare integer exact match) instead of gold's SUBSTR(atom_id,-2)='19' (a string suffix match on the compound identifier)"
+240,toxicology,challenging,retrieval,Schema linking,wrong column,filters molecule.label='TR004' instead of gold's atom.molecule_id='TR004'
+242,toxicology,moderate,retrieval,Schema linking,wrong column,"selects molecule.label instead of gold's molecule_id; also treats atom_id as numeric BETWEEN instead of gold's SUBSTR string-suffix BETWEEN, and drops the label='+' filter"
+243,toxicology,moderate,retrieval,Schema linking,wrong column,joins connected via c.molecule_id (connected has no molecule_id column) when molecule_id lives on the already-joined bond table - should have joined via bond_id instead; also uses full element names instead of 'p'/'n'
+244,toxicology,moderate,aggregate,Nesting problem,wrong sub-query,"replaces gold's WITH sub CTE + tie-preserving cnt=(SELECT MAX(cnt)...) with ORDER BY COUNT(*) DESC LIMIT 1, dropping ties; also 'double' instead of '='"
+245,toxicology,moderate,aggregate,Predicate error,Filter value error,element='iodine' instead of the stored abbreviated code 'i'
+247,toxicology,challenging,retrieval,Predicate error,Predicate semantic error,adds an extra 'atom_id NOT IN (SELECT atom_id2 FROM connected)' condition gold doesn't have
+248,toxicology,simple,retrieval,Schema linking,wrong column,substitutes molecule.label='TR041' for bond.molecule_id='TR041' (molecule_id already lives on the joined bond table); also 'triple' instead of '#'
+249,toxicology,challenging,retrieval,Schema linking,wrong table,substitutes molecule.label='TR144_8_19' (via molecule join) for gold's connected.bond_id='TR144_8_19' - connected is dropped entirely
+253,toxicology,challenging,retrieval,Predicate error,Filter value error,bond_type='triple' instead of gold's '#' - structure otherwise matches gold exactly
+255,toxicology,moderate,aggregate,JOIN errors,missing table,"entirely omits the molecule join and the label='+' numerator condition, instead computing the overall percentage of bond_type='single' among ALL bonds"
+260,toxicology,moderate,aggregate,Predicate error,Predicate semantic error,restructures gold's molecule-level 'contains a P/Br atom somewhere' existence check into a per-atom filter; also uses 'phosphorus'/'bromine'/'triple' instead of 'p'/'br'/'#'
+263,toxicology,challenging,aggregate,Predicate error,Filter value error,bond_type='single' and element='chlorine' - both wrong/invented values causing zero matches; also restructures the molecule-scoping into a duplicating direct atom-bond join
+273,toxicology,moderate,aggregate,Predicate error,Filter value error,label LIKE '%carcinogenic%' and element='chlorine' instead of gold's '+' and 'cl'
+281,toxicology,challenging,retrieval,GROUP BY errors,wrong column,"groups by molecule_id instead of gold's element, replacing the per-element COUNT(*) output with an arbitrary single row via LIMIT 3,1; also drops the SUBSTR atom_id filter"
+282,toxicology,challenging,aggregate,Predicate error,Filter value error,element='H' (uppercase) instead of the stored lowercase code 'h'
+327,toxicology,moderate,aggregate,Schema linking,wrong column,selects molecule.label instead of gold's molecule_id; also restructures the label='-' filter into NOT LIKE '%carcinogenic%'
+723,superhero,moderate,aggregate,Predicate error,Filter value error,colour='blue' (case) doesn't match gold's stored 'Blue'
+724,superhero,challenging,retrieval,Predicate error,Filter value error,colour='blue'/'blond' (case) don't match gold's stored 'Blue'/'Blond'
+726,superhero,moderate,retrieval,Predicate error,Predicate semantic error,drops the height_cm IS NOT NULL AND height_cm != 0 filter entirely; also selects an extra height_cm column
+728,superhero,moderate,aggregate,Nesting problem,wrong sub-query,missing RANK() OVER (ORDER BY COUNT(...) DESC) window function
+732,superhero,moderate,retrieval,Invalid SQL,wrong column,"s.speed does not exist anywhere in this schema - Speed is a value in hero_attribute/attribute, not a column"
+733,superhero,moderate,aggregate,Predicate error,Filter value error,colour='gold' (case) doesn't match gold's stored 'Gold'
+736,superhero,moderate,retrieval,Predicate error,Filter value error,"attribute_name='intelligence' (lowercase) doesn't match the stored value 'Intelligence', causing the subquery to return no rows"
+743,superhero,challenging,aggregate,Predicate error,Predicate semantic error,"uses alignment='Self-Centric' instead of gold's 'Bad', and computes the percentage over ALL superheroes instead of restricting the population (WHERE alignment='Bad') as gold does"
+744,superhero,challenging,aggregate,Predicate error,Filter value error,"publisher_name IN ('DC','Marvel') instead of the real stored values 'DC Comics'/'Marvel Comics', so no rows match at all"
+750,superhero,simple,aggregate,Predicate error,Predicate semantic error,drops the weight_kg > 0 filter entirely
+753,superhero,moderate,retrieval,JOIN errors,missing table,"substitutes eye_colour_id IS NULL for gold's JOIN colour + colour='No Colour' - 'No Colour' is a specific categorical value, not the same as a NULL/missing eye_colour_id"
+758,superhero,moderate,retrieval,Other,missing/redundant DISTINCT,"missing DISTINCT, otherwise identical to gold"
+766,superhero,moderate,retrieval,Nesting problem,wrong sub-query,"replaces gold's WITH max_strength CTE (finding all heroes tied for max Strength) with ORDER BY attribute_value DESC LIMIT 1, dropping ties"
+772,superhero,challenging,retrieval,Schema linking,wrong column,references h.hair_colour_id (colour table has no such column) when hair_colour_id actually lives on the already-joined superhero table (aliased sp)
+775,superhero,challenging,aggregate,Schema linking,wrong column,uses eye_colour_id instead of gold's skin_colour_id - a different real column entirely
+782,superhero,moderate,retrieval,Predicate error,Filter value error,colour='black' (case) doesn't match gold's stored 'Black'
+788,superhero,challenging,aggregate,Predicate error,Predicate semantic error,"inverts which condition is the population restriction - filters WHERE publisher='Marvel Comics' and computes %Female within that, instead of gold's restricting to Female and computing %Marvel within Female; also uses INNER JOIN instead of gold's LEFT JOIN"
+790,superhero,moderate,retrieval,Schema linking,wrong column,"filters on superhero_name = 'Emil Blonsky'/'Charles Chandler' instead of gold's full_name - these are civilian names, not superhero alias names"
+791,superhero,simple,aggregate,Predicate error,Predicate semantic error,"drops the height_cm > 0 filter entirely, including zero/placeholder heights in the average"
+794,superhero,moderate,retrieval,Nesting problem,wrong sub-query,"collapses gold's tie-preserving '= (SELECT MAX(...))' equality subquery to ORDER BY attribute_value DESC LIMIT 1, dropping ties"
+797,superhero,moderate,retrieval,Predicate error,Filter value error,colour='blue'/'brown' (case) don't match gold's stored 'Blue'/'Brown'
+800,superhero,moderate,aggregate,Predicate error,Filter value error,colour='blue' (case) doesn't match gold's stored 'Blue'
+819,superhero,challenging,aggregate,Predicate error,Predicate semantic error,"substitutes 'eye_colour_id IS NULL' for gold's 'eye_colour_id = 1' (a specific real colour id, not equivalent to NULL); also drops the 'OR weight_kg = 0' half of gold's weight filter"
+822,superhero,moderate,aggregate,Predicate error,Filter value error,colour='green'/alignment='bad' (case) don't match gold's stored 'Green'/'Bad'
+829,superhero,challenging,aggregate,Predicate error,Filter value error,"publisher_name='DC' instead of the real stored value 'DC Comics', so the DC subquery returns no rows"
+846,formula_1,moderate,retrieval,Schema linking,wrong table,substitutes results for qualifying (both per-race driver-performance tables)
+850,formula_1,simple,retrieval,Other,missing/redundant DISTINCT,"missing DISTINCT, otherwise identical to gold"
+854,formula_1,simple,retrieval,JOIN errors,missing table,"omits the races join, filtering on circuits.name='Australian Grand Prix' instead of races.name"
+857,formula_1,simple,retrieval,JOIN errors,missing table,"omits the races join, filtering on circuits.name='Abu Dhabi Grand Prix' instead of races.name"
+861,formula_1,simple,retrieval,Predicate error,Predicate semantic error,qualifying_3_time = '0:01:54' (wrong format) doesn't match the stored 'M:SS.mmm' format that gold's LIKE '1:54%' matches
+865,formula_1,moderate,retrieval,Schema linking,wrong column,filters results.position IS NOT NULL instead of gold's results.time IS NOT NULL - a different real column with different NULL semantics for DNF drivers
+866,formula_1,moderate,retrieval,Predicate error,Predicate semantic error,time='0:01:27' (wrong format) instead of gold's LIKE '1:27%' pattern match; also missing DISTINCT
+868,formula_1,simple,retrieval,JOIN errors,missing table,"omits the races join, filtering on circuits.name='Malaysian Grand Prix' instead of races.name"
+869,formula_1,moderate,retrieval,Schema linking,wrong table,substitutes constructorStandings for constructorResults (per-race points earned vs cumulative standings)
+872,formula_1,simple,retrieval,Predicate error,Predicate semantic error,qualifying_3_time = '0:01:33' (wrong format) instead of gold's LIKE '1:33%' pattern
+877,formula_1,moderate,retrieval,Predicate error,Predicate semantic error,"drops the results.time IS NOT NULL filter entirely, including DNF/non-finishing drivers gold excludes"
+879,formula_1,moderate,retrieval,Predicate error,Predicate semantic error,"computes MAX(fastest_lap_speed) without CAST to REAL, so the comparison is a string/lexicographic max instead of numeric max, unlike gold's explicit CAST(...AS REAL)"
+881,formula_1,moderate,aggregate,GROUP BY errors,wrong column,introduces an unneeded per-driver GROUP BY where gold computes one global aggregate; also selects driver names gold's output never includes
+884,formula_1,moderate,retrieval,Predicate error,Predicate semantic error,"drops the month-matching condition entirely, collapsing to just the earliest race in the minimum year instead of gold's races matching both the year and month of the very first race"
+894,formula_1,moderate,retrieval,Schema linking,wrong column,selects lt.time (a formatted string) instead of gold's lt.milliseconds in the output
+896,formula_1,challenging,aggregate,Schema linking,wrong table,replaces driverStandings.position<>1 rate calculation with results + a nonsensical R.round=1 condition
+897,formula_1,moderate,aggregate,GROUP BY errors,wrong column,"drops the GROUP BY forename/surname/nationality + ORDER BY COUNT(wins) DESC ranking, instead filtering to the row(s) with the overall MAX wins value via a subquery"
+898,formula_1,simple,retrieval,Other,SELECT-list shape,"column order differs (name-columns before age vs gold's age-first), likely causing a positional evaluation mismatch"
+902,formula_1,simple,retrieval,Schema linking,wrong table,replaces driverStandings (cumulative championship standing) with results.grid_position (starting grid position)
+904,formula_1,moderate,retrieval,Schema linking,wrong table,substitutes results.fastest_lap_time (a per-race time string) for lapTimes.milliseconds (a per-lap numeric time)
+915,formula_1,simple,retrieval,Schema linking,wrong column,subquery references date_of_birth directly on `results` (no join to drivers in that scope); overall query structure bears no resemblance to gold's simple oldest-driver lookup
+930,formula_1,simple,retrieval,Schema linking,wrong column,"orders by results.position (finishing position) instead of filtering on results.rank=0 (fastest-lap rank flag), also collapsing gold's multi-row IN-subquery into a single ORDER BY/LIMIT 1"
+937,formula_1,simple,retrieval,Predicate error,Filter value error,garbled race name 'AustChineseralian Grand Prix' instead of gold's 'Chinese Grand Prix'
+940,formula_1,moderate,aggregate,Predicate error,Predicate semantic error,"drops the results.time IS NOT NULL filter, counting all entrants (including DNFs) instead of just drivers with a completed time"
+944,formula_1,challenging,aggregate,Schema linking,wrong column,identifies the last-place driver via position = COUNT(*) instead of gold's positionOrder = MAX(positionOrder); position can have gaps/NULLs for non-classified finishers
+950,formula_1,simple,retrieval,Schema linking,wrong table,substitutes constructorResults for constructorStandings
+955,formula_1,challenging,aggregate,Schema linking,wrong table,substitutes driverStandings.position=1 (championship leader after the race) for results.position=1 (race winner); also averages races.time instead of results.milliseconds
+959,formula_1,simple,retrieval,JOIN errors,missing table,"driverStandings.year doesn't exist; year lives on races, which isn't joined; also substitutes driverStandings.position=1 for gold's time-format filter"
+962,formula_1,challenging,aggregate,Invalid SQL,Other execution error,"references alias `DR.driver_id` which was never declared in FROM/JOIN (drivers is aliased `D`, not `DR`)"
+963,formula_1,moderate,aggregate,Predicate error,Predicate semantic error,compares lt.time (a 'M:SS.mmm' text string) via string `<` against '02:00.00' instead of gold's numeric seconds conversion - string comparison is lexicographic and doesn't match numeric ordering
+967,formula_1,simple,aggregate,Predicate error,Filter value error,uses invented nationality value 'Netherlandic' instead of 'Dutch' (also applies the filter before the ORDER BY/LIMIT 3 instead of after)
+972,formula_1,moderate,retrieval,Other,missing/redundant DISTINCT,"missing DISTINCT, otherwise equivalent to gold"
+977,formula_1,simple,aggregate,Predicate error,Predicate semantic error,uses inclusive BETWEEN 50 AND 100 instead of gold's exclusive raceId>50 AND raceId<100; drops the 'time IS NOT NULL' requirement; assumes status_id=2 corresponds to 'Disqualified' via a subquery lookup
+978,formula_1,simple,retrieval,Other,missing/redundant DISTINCT,"missing DISTINCT, otherwise identical to gold"
+981,formula_1,moderate,retrieval,Other,wrong aggregate function or scaling,subquery selects MIN(date_of_birth) (oldest driver) instead of gold's youngest-driver selection; also lacks the outer ORDER BY date ASC LIMIT 1
+989,formula_1,moderate,retrieval,Predicate error,Predicate semantic error,"filters on results.position=1 instead of gold's time LIKE '_:%:__.___' pattern match - different column, different condition"
+990,formula_1,challenging,retrieval,Schema linking,wrong table,substitutes constructorStandings for results; also uses position=1 instead of gold's time-format pattern filter
+994,formula_1,challenging,aggregate,JOIN errors,extra table,"adds an unnecessary constructorStandings join, which could silently drop constructor-race rows lacking a matching standings entry"
+1001,formula_1,challenging,retrieval,Schema linking,wrong column,references q.round (qualifying has no round column) when round lives on the already-joined races table; also substitutes q.position=1 for gold's q3 IS NOT NULL + fastest-time ranking logic
+1014,formula_1,challenging,aggregate,Schema linking,wrong table,"substitutes lapTimes (with a broken race_id=circuit_id join condition) for gold's races+results+circuits chain, and selects lap NUMBER instead of any time-based measure"
+1025,european_football_2,moderate,aggregate,Predicate error,Filter value error,season='2016' instead of gold's '2015/2016'
+1028,european_football_2,challenging,aggregate,Schema linking,wrong column,selects team_short_name instead of gold's team_long_name; also collapses the tie-preserving HAVING COUNT(*) = (SELECT MAX...) into ORDER BY COUNT(*) DESC LIMIT 1
+1029,european_football_2,moderate,retrieval,Other,SELECT-list shape,adds an extra team_long_name column gold's SELECT list doesn't have
+1030,european_football_2,moderate,aggregate,Predicate error,Filter value error,season='2016' instead of gold's '2015/2016'
+1031,european_football_2,challenging,retrieval,Other,missing/redundant DISTINCT,missing DISTINCT (also selects an extra player_name column)
+1032,european_football_2,moderate,aggregate,Nesting problem,HAVING clause mismatch,tie-preserving HAVING COUNT(m.id) = (SELECT MAX(match_count)...) collapsed to a plain ORDER BY/LIMIT 1
+1035,european_football_2,simple,retrieval,Other,missing/redundant DISTINCT,"missing DISTINCT, otherwise identical to gold"
+1036,european_football_2,challenging,aggregate,Other,missing/redundant DISTINCT,missing DISTINCT; a team can have multiple 2012 Team_Attributes snapshots
+1037,european_football_2,challenging,aggregate,Other,missing/redundant DISTINCT,"uses COUNT(*)/SUM instead of gold's COUNT(DISTINCT id), double-counting players with multiple Player_Attributes rows"
+1080,european_football_2,moderate,aggregate,Predicate error,Filter value error,attacking_work_rate='High' instead of gold's 'low'; also 'Left' case differs; COUNT(*) not deduped
+1084,european_football_2,challenging,aggregate,Predicate error,Predicate semantic error,adds an extra attacking_work_rate='High' condition gold doesn't have; also defensive_work_rate case differs
+1088,european_football_2,moderate,retrieval,Other,missing/redundant DISTINCT,outer query lacks DISTINCT; if Player has duplicate rows per player_api_id the un-deduped output would differ from gold's SELECT DISTINCT
+1091,european_football_2,moderate,aggregate,Predicate error,Predicate semantic error,splits the League.name filter across country.name + a truncated league name ('Jupiler League') instead of gold's single exact match on 'Belgium Jupiler League'; also adds a vestigial Country join
+1092,european_football_2,simple,aggregate,Nesting problem,HAVING clause mismatch,tie-preserving HAVING COUNT(t2.id) = (SELECT MAX(match_count)...) collapsed to ORDER BY COUNT(*) DESC LIMIT 1
+1094,european_football_2,challenging,aggregate,Nesting problem,wrong sub-query,"omits gold's per-player 'most recent snapshot' CTEs (ORDER BY date DESC LIMIT 1), instead joining all historical Player_Attributes rows for each player without narrowing to the latest one"
+1098,european_football_2,moderate,retrieval,Schema linking,wrong column,filters team_short_name='Ajax' instead of gold's team_long_name='Ajax'; also mixes MAX() with a non-aggregated column without GROUP BY
+1102,european_football_2,moderate,retrieval,Predicate error,Predicate semantic error,"uses exact date='2016-06-23' instead of gold's SUBSTR(date,1,10)='2016-06-23'; Player_Attributes.date likely includes a time suffix so exact equality fails"
+1103,european_football_2,moderate,retrieval,Predicate error,Predicate semantic error,"uses exact date='2016-02-04' instead of gold's SUBSTR(date,1,10)='2016-02-04'"
+1105,european_football_2,moderate,retrieval,Predicate error,Predicate semantic error,uses exact date='2015-05-01' instead of gold's LIKE '2015-05-01%' pattern
+1107,european_football_2,moderate,retrieval,JOIN errors,wrong column (key),joins Player_Attributes to Player via player_api_id instead of gold's player_fifa_api_id
+1110,european_football_2,moderate,retrieval,Predicate error,Predicate semantic error,uses exact date='2010-02-22' instead of gold's LIKE '2010-02-22%' pattern
+1113,european_football_2,moderate,retrieval,Predicate error,Predicate semantic error,uses exact date='2015-09-10' instead of gold's LIKE '2015-09-10%' pattern
+1114,european_football_2,challenging,aggregate,JOIN errors,wrong column (key),joins Player_Attributes to Player via player_api_id instead of gold's player_fifa_api_id
+1115,european_football_2,challenging,aggregate,JOIN errors,wrong column (key),joins on player_api_id (via Player) instead of gold's player_fifa_api_id
+1116,european_football_2,simple,retrieval,Nesting problem,wrong sub-query,"missing DENSE_RANK() OVER (ORDER BY height DESC) window function; uses ORDER BY/LIMIT 10 instead, which drops ties and returns 10 rows not all rank=1 ties"
+1122,european_football_2,simple,aggregate,Schema linking,wrong column,subquery ranks by strength instead of gold's overall_rating
+1130,european_football_2,moderate,retrieval,Predicate error,Filter value error,chance_creation_passing_class='Low' instead of gold's 'Safe'; also missing DISTINCT
+1136,european_football_2,moderate,aggregate,Predicate error,Predicate semantic error,adds an extra attacking_work_rate='High' condition gold doesn't have; also uses COUNT(*) instead of COUNT(DISTINCT player_api_id)
+1139,european_football_2,challenging,retrieval,Predicate error,Filter value error,league name spelled 'Belgian Jupiler League' instead of the stored 'Belgium Jupiler League'
+1144,european_football_2,simple,retrieval,Nesting problem,wrong sub-query,"missing subquery finding ALL players tied for MAX(weight); collapses to ORDER BY/LIMIT 1, dropping ties"
+1145,european_football_2,simple,aggregate,Predicate error,Filter value error,season='2015-2016' (hyphen) instead of gold's '2015/2016' (slash)
+1147,european_football_2,simple,aggregate,Schema linking,wrong column,subquery ranks by strength instead of gold's overall_rating
+1148,european_football_2,moderate,aggregate,Schema linking,wrong column,references `strength` (a Player_Attributes-only column) directly on Player with no join present at all; also substitutes overall_rating>70 with strength>70
+1149,thrombosis_prediction,moderate,aggregate,Predicate error,Filter value error,"uses 'Inpatient'/'Outpatient'/'Male' instead of the actual stored codes '+'/'-'/'M', causing zero matches; also introduces a GROUP BY admission_type gold doesn't have"
+1150,thrombosis_prediction,moderate,aggregate,Predicate error,Filter value error,sex='female' instead of the stored single-letter code 'F'
+1152,thrombosis_prediction,moderate,aggregate,Predicate error,Filter value error,admission_type='Inpatient'/'Outpatient' instead of the stored codes '+'/'-'
+1155,thrombosis_prediction,simple,retrieval,Predicate error,Filter value error,lactate_dehydrogenase>175 instead of gold's threshold >500 - a wrong/invented value
+1156,thrombosis_prediction,moderate,retrieval,Schema linking,wrong column,filters on thrombosis_degree>0 instead of gold's russell_viper_venom_time='+' - a completely different Examination column
+1157,thrombosis_prediction,simple,retrieval,Predicate error,Filter value error,thrombosis_degree='severe' (a string) instead of the real numeric value 2
+1162,thrombosis_prediction,moderate,aggregate,Predicate error,Filter value error,uses sex='female' and admission_type='门诊' (Chinese text) instead of the stored codes 'F' and '-'
+1164,thrombosis_prediction,moderate,aggregate,Predicate error,Predicate semantic error,uses thrombosis_degree=(SELECT MAX(thrombosis_degree) FROM Examination) instead of the literal value 1; also sex='女' (Chinese) instead of 'F'
+1166,thrombosis_prediction,simple,retrieval,Nesting problem,wrong set operation,drops gold's UNION with the NOT EXISTS edge-case branch entirely
+1168,thrombosis_prediction,challenging,retrieval,Schema linking,wrong column,"substitutes Patient.first_record_date (via MAX, patient-level) for gold's Laboratory.Date (individual lab record date); also computes age relative to 'now' instead of gold's Patient.""First Date"" field"
+1169,thrombosis_prediction,challenging,aggregate,Predicate error,Predicate semantic error,"replaces gold's sex-specific UA threshold logic (M:<=8.0, F:<=6.5) with a generic 'uric_acid > AVG' filter and simple male/female counts; also uses 'male'/'female' instead of 'M'/'F'"
+1171,thrombosis_prediction,challenging,aggregate,Predicate error,Filter value error,age difference compared to <0 instead of gold's <18 - a wrong threshold value
+1175,thrombosis_prediction,moderate,retrieval,Other,SELECT-list shape,SELECT returns raw birthday instead of computing age like gold does; also adds a possibly row-multiplying Examination join
+1179,thrombosis_prediction,moderate,retrieval,Other,SELECT-list shape,selects three IgG/IgM/IgA columns instead of just the requested aCL IgM column
+1185,thrombosis_prediction,challenging,aggregate,Other,wrong aggregate function or scaling,computes (MAX-MIN)/COUNT(DISTINCT Date) instead of gold's SUM(Nov T-CHO)-SUM(Dec T-CHO))/SUM(Nov T-CHO) - a different aggregate approach entirely
+1187,thrombosis_prediction,moderate,retrieval,Schema linking,wrong column,filters on Examination.examination_date instead of gold's Laboratory.Date - a different real date column; also adds unnecessary Patient/Examination joins
+1189,thrombosis_prediction,challenging,aggregate,Predicate error,Predicate semantic error,subquery computes AVG(anticardiolipin_igm)*1.2 over ALL Examination rows instead of restricting to Thrombosis=2 AND ANA Pattern='S' as gold's subquery does
+1192,thrombosis_prediction,challenging,retrieval,Predicate error,Filter value error,uses admission_type='门诊' (Chinese text) instead of '-'; total_bilirubin BETWEEN 5.1 AND 20.0 instead of gold's < 2.0
+1195,thrombosis_prediction,moderate,aggregate,Predicate error,Filter value error,sex='female' instead of the stored single-letter code 'F'
+1198,thrombosis_prediction,simple,aggregate,Predicate error,Filter value error,sex='female' instead of the stored single-letter code 'F'
+1201,thrombosis_prediction,moderate,aggregate,Predicate error,Filter value error,CASE WHEN sex='女' (Chinese text) instead of 'F'
+1205,thrombosis_prediction,moderate,retrieval,Predicate error,Predicate semantic error,"replaces gold's sex-specific UA threshold logic (F: >6.5, M: >8.0) with a single generic 'uric_acid BETWEEN 2.4 AND 7.0' check that doesn't reference Patient.SEX at all"
+1208,thrombosis_prediction,moderate,retrieval,Predicate error,Filter value error,sex='male' instead of 'M'; alanine_aminotransferase>40 instead of gold's >=60
+1209,thrombosis_prediction,moderate,retrieval,Predicate error,Filter value error,threshold >40 instead of gold's >60
+1220,thrombosis_prediction,simple,retrieval,Predicate error,Filter value error,urea_nitrogen=15 instead of gold's exact value 29
+1225,thrombosis_prediction,moderate,aggregate,Predicate error,Predicate semantic error,replaces gold's single T-BIL>=2.0 threshold with a totally different two-sided '< 0.3 OR > 1.2' range; also uses COUNT(*) instead of GROUP_CONCAT(DISTINCT ID)
+1227,thrombosis_prediction,moderate,aggregate,Invalid SQL,Other execution error,no such function: YEAR (non-SQLite function)
+1229,thrombosis_prediction,moderate,aggregate,Predicate error,Filter value error,threshold >150 instead of gold's >=200
+1231,thrombosis_prediction,challenging,aggregate,Predicate error,Filter value error,sex='male' instead of 'M'; threshold >100 instead of gold's >=250
+1232,thrombosis_prediction,challenging,retrieval,Predicate error,Predicate semantic error,replaces gold's simple GLU>=180 threshold with a two-sided '<70 OR >110' abnormal-range check (also missing parentheses causes an operator-precedence bug); total_cholesterol BETWEEN 150-200 instead of gold's <250
+1235,thrombosis_prediction,moderate,retrieval,Predicate error,Predicate semantic error,compares red_blood_cell_count against a computed AVG(...) subquery instead of gold's fixed literal threshold 3.5
+1238,thrombosis_prediction,moderate,retrieval,Predicate error,Filter value error,hemoglobin BETWEEN 13.5-17.5 instead of gold's >10 AND <17
+1239,thrombosis_prediction,challenging,aggregate,Predicate error,Filter value error,hematocrit BETWEEN 45-50 instead of gold's >=52 - a non-overlapping wrong threshold
+1241,thrombosis_prediction,challenging,aggregate,Predicate error,Filter value error,platelet_count thresholds 150/450 instead of gold's 100/400
+1242,thrombosis_prediction,challenging,retrieval,Predicate error,Filter value error,platelet_count BETWEEN 150000-450000 instead of gold's 100-400 - assumes a different unit scale than actually stored
+1243,thrombosis_prediction,challenging,aggregate,Predicate error,Predicate semantic error,restructures gold's nested-CASE percentage-within-PT>=14-subset calculation into a flat WHERE-based percentage over the whole age>55 population; also uses PT>13.5 instead of gold's >=14
+1247,thrombosis_prediction,challenging,aggregate,Predicate error,Filter value error,sex='male' instead of 'M'; white_blood_cell_count BETWEEN 4000-11000 (wrong unit scale) instead of 3.5-9.0; fibrinogen>400 instead of gold's >=450
+1251,thrombosis_prediction,simple,aggregate,Predicate error,Filter value error,immunoglobulin_g>11.9 instead of gold's >=2000
+1252,thrombosis_prediction,moderate,aggregate,Predicate error,Filter value error,uses immunoglobulin_g='normal' (a nonexistent categorical value) instead of gold's numeric BETWEEN 900-2000 range
+1254,thrombosis_prediction,moderate,aggregate,Predicate error,Filter value error,immunoglobulin_a='normal' instead of gold's numeric BETWEEN 80-500 range
+1255,thrombosis_prediction,moderate,aggregate,Predicate error,Filter value error,immunoglobulin_m>100 instead of gold's (<=40 OR >=400); also drops the DISTINCT-ID dedup subquery
+1256,thrombosis_prediction,moderate,aggregate,Predicate error,Predicate semantic error,"replaces gold's 'CRP=""+"" AND first_record_date IS NULL' with 'no Laboratory row has non-null CRP at all' - an entirely different, unrelated condition"
+1257,thrombosis_prediction,challenging,aggregate,Predicate error,Filter value error,creatinine>1.2 instead of gold's >=1.5
+1265,thrombosis_prediction,moderate,aggregate,Predicate error,Filter value error,uses 'normal' instead of 'negative'/'0' for RNP; 'admitted' instead of '+' for Admission
+1267,thrombosis_prediction,moderate,aggregate,Nesting problem,wrong sub-query,"drops gold's WITH CTE structure (HAVING MAX(COALESCE(Thrombosis,0))=0 across ALL of a patient's exam records) in favor of a flat JOIN with thrombosis_degree IS NULL; also uses anti_sm='normal' instead of 'negative'/'0'"
+1270,thrombosis_prediction,challenging,aggregate,JOIN errors,missing table,"anti_scl70 (SC170) lives on Laboratory, which predicted never joins (only Patient+Examination); also restructures the NOT EXISTS Symptoms check and uses sex='female' instead of 'F'"
+1275,thrombosis_prediction,moderate,aggregate,Predicate error,Filter value error,uses 'normal' instead of 'negative'/'0' for both centromere and SSB; 'male' instead of 'M'
+1281,thrombosis_prediction,moderate,retrieval,Predicate error,Predicate semantic error,"replaces GOT>=60 with an OR of AST/ALT>40 (wrong threshold, extra unrelated column); also uses MIN(birthday) (oldest patient) instead of finding the youngest"
+1302,thrombosis_prediction,challenging,aggregate,Schema linking,wrong column,substitutes thrombosis_degree>0 for gold's (KCT='+' OR RVVT='+' OR LAC='+') coagulation-test check - entirely different columns
+1317,student_club,moderate,aggregate,Predicate error,Predicate semantic error,"adds an unnecessary/likely-invalid major_id IN (SELECT... major_name='Student_Club') condition via subquery, which gold doesn't have at all"
+1322,student_club,moderate,aggregate,Predicate error,Filter value error,type='meeting' (lowercase) doesn't match the stored value 'Meeting'
+1331,student_club,simple,retrieval,JOIN errors,missing table,omits the member join entirely and misapplies 'Vice President' to income.source instead of member.position; also incorrectly SUMs the amount where gold just selects individual row(s)
+1334,student_club,simple,retrieval,Predicate error,Predicate semantic error,"adds an extra, invalid m.position='Student_Club' condition gold doesn't have"
+1338,student_club,moderate,retrieval,Predicate error,Predicate semantic error,uses exact equality event_date='2019-10-08' instead of gold's LIKE '2019-10-08%' pattern; also selects an extra expense_id column
+1340,student_club,moderate,aggregate,Predicate error,Predicate semantic error,"adds an extra, seemingly-invalid budget.event_status='Student_Club' condition to both halves of the subtraction"
+1344,student_club,simple,retrieval,Schema linking,wrong table,substitutes event (with its own notes/event_date/type columns) for income (source/date_received) - different real table despite both having a 'notes' column
+1357,student_club,simple,retrieval,JOIN errors,missing table,"first_name/last_name live on member, which predicted never joins; also 'dues' case differs from stored 'Dues'"
+1359,student_club,challenging,aggregate,Other,wrong aggregate function or scaling,computes COUNT(*) of budget rows exceeding a threshold subquery instead of gold's direct ratio SUM(kickoff amount)/SUM(october amount)
+1376,student_club,moderate,retrieval,Nesting problem,HAVING clause mismatch,collapses gold's tie-preserving GROUP BY/HAVING nested MAX-ratio subquery to a plain ORDER BY/LIMIT 1
+1380,student_club,simple,aggregate,Predicate error,Filter value error,category='food' (lowercase) doesn't match the stored value 'Food'
+1387,student_club,moderate,retrieval,JOIN errors,missing table,"budget has no member_id column; the correct link is budget→expense (link_to_budget)→member (link_to_member), but predicted joins budget directly to member, skipping expense"
+1390,student_club,moderate,aggregate,JOIN errors,missing table,"joins event directly to expense via `e.event_id = ex.budget_id` (an ID-space mismatch), omitting the budget table that correctly bridges event→budget→expense"
+1392,student_club,simple,retrieval,GROUP BY errors,wrong column,introduces GROUP BY income_source + SUM(amount) ranking instead of gold's simple ORDER BY source DESC LIMIT 1
+1394,student_club,simple,aggregate,Predicate error,Predicate semantic error,"adds an extra, invalid member.position='Student_Club' condition gold doesn't have"
+1398,student_club,moderate,retrieval,Predicate error,Filter value error,category='advertisement' (lowercase) doesn't match the stored value 'Advertisement'
+1403,student_club,moderate,retrieval,Schema linking,wrong column,recomputes 'remaining' via SUM(expense.cost) - budget.amount instead of using budget.remaining directly; drops the remaining<0 filter and sorts DESC instead of ASC
+1404,student_club,moderate,aggregate,Schema linking,wrong column,references e.category (expense has no category column) when category actually lives on the already-joined budget table
+1422,student_club,simple,retrieval,Schema linking,wrong table,selects budget.category (via an unnecessary budget join) instead of gold's event.type - budget is never referenced by gold at all
+1427,student_club,moderate,retrieval,Predicate error,Filter value error,type='guest speaker' (case) doesn't match the stored value 'Guest Speaker'; also missing DISTINCT
+1432,student_club,moderate,aggregate,Predicate error,Predicate semantic error,drops member.position='Member' entirely and substitutes an unrelated income.income_source='Student_Club' condition
+1435,student_club,moderate,retrieval,Predicate error,Filter value error,type='game'/status='closed' (case) don't match stored 'Game'/'Closed'; also missing DISTINCT
+1457,student_club,challenging,aggregate,Other,missing/redundant DISTINCT,outer query lacks DISTINCT; also drops the budget join within the AVG subquery entirely
+1460,student_club,challenging,retrieval,Predicate error,Predicate semantic error,"splits the single exact description 'Water, Veggie tray, supplies' into a 3-value lowercased IN clause instead of matching the full combined string exactly"
+1472,debit_card_specializing,moderate,aggregate,JOIN errors,missing table,"omits customers/Segment='LAM' filter entirely; also fails to SUM per customer, comparing to a global MIN reading instead"
+1473,debit_card_specializing,moderate,aggregate,Predicate error,Predicate semantic error,"strftime('%Y', date) misapplied to yearmonth's 'YYYYMM' text format returns NULL, so the WHERE filter matches zero rows; also drops the per-customer SUM/derived-table + /12 scaling structure"
+1476,debit_card_specializing,challenging,aggregate,Predicate error,Predicate semantic error,"strftime('%Y', y.date) misapplied to yearmonth.Date, stored as 'YYYYMM' text, not an ISO date string, so it returns NULL for all rows unlike gold's SUBSTR(Date,1,4)='2012'"
+1479,debit_card_specializing,moderate,aggregate,GROUP BY errors,wrong column,"groups by strftime('%Y', date) (NULL for all rows since Date is 'YYYYMM' text) instead of gold's SUBSTR(Date,1,4), collapsing all years into one group"
+1480,debit_card_specializing,moderate,aggregate,Predicate error,Predicate semantic error,"strftime('%Y', date) misapplied to 'YYYYMM' text returns NULL, so the WHERE filter matches zero rows; the also-wrong month-extraction/aggregate-choice in GROUP BY/ORDER BY are moot"
+1481,debit_card_specializing,challenging,aggregate,Schema linking,wrong column,subqueries reference `consumption` directly on `customers` (no join to yearmonth in that scope) - a column that only exists on yearmonth; overall logic diverges hugely from gold's segment-comparison CTEs
+1482,debit_card_specializing,challenging,aggregate,Predicate error,Predicate semantic error,"strftime('%Y', date) misapplied to yearmonth's 'YYYYMM' text returns NULL for every CASE WHEN comparison, zeroing out all three sums; also restructures gold's three scalar sums into a GROUP BY c.segment aggregation"
+1483,debit_card_specializing,simple,aggregate,Predicate error,Predicate semantic error,"BETWEEN uses ISO-hyphenated date bounds ('2013-08-01'/'2013-11-30') against Date stored as plain 'YYYYMM' text, so none of customer 6's monthly rows satisfy the range"
+1484,debit_card_specializing,simple,aggregate,Predicate error,Filter value error,'Czech Republic'/'Slovakia' used instead of the stored codes 'CZE'/'SVK'; also 'discount' case differs from gold's 'Discount'
+1486,debit_card_specializing,simple,aggregate,JOIN errors,extra table,"unnecessary JOIN to transactions_1k multiplies each customer row by their transaction count, inflating the SUM"
+1490,debit_card_specializing,moderate,aggregate,JOIN errors,Join type error,uses INNER JOIN where gold's LEFT JOIN preserves customers with no yearmonth rows; also drops the COUNT(DISTINCT...) per-customer dedup
+1493,debit_card_specializing,simple,aggregate,Predicate error,Predicate semantic error,"BETWEEN '2012-02-01' AND '2012-02-29' (ISO-date literals) applied to Date stored as 'YYYYMM' text ('201202') never matches lexicographically, causing zero rows instead of gold's exact match Date='201202'"
+1498,debit_card_specializing,simple,aggregate,GROUP BY errors,wrong column,"missing GROUP BY entirely (gold groups by month); also uses MAX instead of SUM, returning the single largest individual reading instead of the peak month's total"
+1505,debit_card_specializing,simple,aggregate,Predicate error,Filter value error,currency='euro' instead of the stored code 'EUR'
+1506,debit_card_specializing,moderate,retrieval,Predicate error,Filter value error,country='Czech Republic' instead of the stored code 'CZE'
+1509,debit_card_specializing,moderate,aggregate,Predicate error,Filter value error,country='Czech Republic' instead of the stored code 'CZE'
+1514,debit_card_specializing,simple,retrieval,Other,missing/redundant DISTINCT,"predicted omits DISTINCT and the (redundant, non-filtering) gasstations join that gold itself never references any column of; if multiple transactions share this exact date/time, duplicate currency values would appear"
+1524,debit_card_specializing,simple,retrieval,Schema linking,wrong table,joins customers instead of gasstations for the Country lookup (both are 1-hop lookup joins from transactions_1k); also uses amount instead of price
+1525,debit_card_specializing,simple,aggregate,Other,missing/redundant DISTINCT,"uses COUNT(*)/SUM(CASE) over raw transaction rows instead of gold's COUNT(DISTINCT CustomerID), double-counting customers with multiple matching transactions"
+1526,debit_card_specializing,challenging,aggregate,Schema linking,wrong column,"subquery uses amount=634.8 instead of gold's price=634.8 (different real column) to identify the customer; also misses the per-year SUM aggregation, self-joining yearmonth month-rows directly"
+1528,debit_card_specializing,simple,aggregate,JOIN errors,extra table,"unnecessary JOIN to transactions_1k multiplies each gas station row by its transaction count, inflating COUNT(*)/SUM; also 'premium' case differs from gold's 'Premium'"
+1529,debit_card_specializing,moderate,aggregate,Schema linking,wrong column,selects amount alone instead of amount*price (the combined quantity needed for 'total spent')
+1531,debit_card_specializing,moderate,aggregate,Schema linking,wrong column,ranks/selects the top customer by SUM(amount) alone instead of gold's SUM(amount*price); computes avg_price_per_item as plain AVG(price) instead of the amount-weighted average; also collapses gold's subquery+outer-query structure
+1533,debit_card_specializing,moderate,retrieval,Predicate error,Predicate semantic error,"date filter uses LIKE '2012-08-%' (a hyphenated format) against yearmonth.Date stored as plain 'YYYYMM' text, matching zero rows instead of gold's exact Date='201208'; also drops the Price/Amount division, comparing raw Price instead"
