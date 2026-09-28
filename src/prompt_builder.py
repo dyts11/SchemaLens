@@ -4,13 +4,16 @@ prompt_builder.py
 Assembles the full prompt string sent to the LLM for a single question
 under a given schema condition.
 
-L3-L6 use a minimal template (schema + question only).
-L1-L2 add a Schema Denormalization Notice before the schema block.
+Two templates, selected by ``include_denorm_notice``:
+  _TEMPLATE_WITH_NOTICE  (default) — the Deduplication Rules notice is inserted
+                         before the schema on EVERY structural level (L1-L6),
+                         so all conditions share one identical prompt template.
+  _TEMPLATE_PLAIN        — schema + question only, on every level.
 
 Usage:
     from src.prompt_builder import build_prompt
-    prompt = build_prompt(schema_string, question)
-    prompt = build_prompt(schema_string, question, structural_level=2)
+    prompt = build_prompt(schema_string, question, structural_level=3)
+    prompt = build_prompt(schema_string, question, structural_level=1, include_denorm_notice=False)
     prompt = build_prompt(schema_string, question, few_shot_examples=[("Q?", "SELECT ...")])
     prompt = build_prompt(schema_string, question, include_cot=True)
     prompt = build_prompt(schema_string, question, evidence="value1 refers to X")
@@ -18,13 +21,13 @@ Usage:
 
 from typing import List, Optional, Tuple
 
-from src.denormalization_notice import DENORMALIZATION_NOTICE
+from src.denormalization_notice import UNIFIED_DENORMALIZATION_NOTICE
 
 # ---------------------------------------------------------------------------
 # Prompt templates
 # ---------------------------------------------------------------------------
 
-_TEMPLATE = """\
+_TEMPLATE_PLAIN = """\
 You are an expert SQLite assistant. Given the database schema and the question \
 below, write a single SQLite SELECT query that correctly answers the question.
 
@@ -41,7 +44,7 @@ Rules:
 
 {evidence_block}{cot_block}### SQL:"""
 
-_TEMPLATE_DENORMALIZED = """\
+_TEMPLATE_WITH_NOTICE = """\
 You are an expert SQLite assistant. Given the database schema and the question \
 below, write a single SQLite SELECT query that correctly answers the question.
 
@@ -50,9 +53,7 @@ Rules:
 - Use only the tables and columns defined in the schema.
 - Do not invent column or table names.
 
-### Schema Denormalization Notice:
-{denormalization_notice}
-
+{notice_block}
 ### Schema:
 {schema}
 
@@ -161,12 +162,13 @@ def build_prompt(
     Args:
         schema: Output of SchemaBuilder.build(structural_level, semantic_level).
         question: Natural-language question from the BIRD dataset.
-        structural_level: When 1 or 2, may include the denormalization notice (L1/L2).
-                          L3-L6 and None use the standard template.
+        structural_level: Structural level of ``schema`` (1-6). Does not affect
+                          the template; used only for the evidence warning.
         semantic_level: Used to warn the LLM when evidence column names differ from
                         those in the current schema (S1/S2 rename columns).
-        include_denorm_notice: If False, L1/L2 use the same template as L3-L6
-                               (schema + question only, no notice block).
+        include_denorm_notice: True (default) inserts the Deduplication Rules
+                               notice on every level; False uses the plain
+                               template on every level.
         few_shot_examples: Optional list of (question, sql) pairs inserted as
                            a '### Examples:' block before the target question.
                            Pass None or [] for zero-shot (default).
@@ -183,16 +185,16 @@ def build_prompt(
     few_shot_block = _format_few_shot_block(few_shot_examples or [])
     evidence_block = _format_evidence_block(evidence, structural_level, semantic_level)
 
-    if structural_level in (1, 2) and include_denorm_notice:
-        return _TEMPLATE_DENORMALIZED.format(
+    if include_denorm_notice:
+        return _TEMPLATE_WITH_NOTICE.format(
             cot_block=cot_block,
-            denormalization_notice=DENORMALIZATION_NOTICE,
+            notice_block=UNIFIED_DENORMALIZATION_NOTICE,
             schema=schema,
             few_shot_block=few_shot_block,
             evidence_block=evidence_block,
             question=question,
         )
-    return _TEMPLATE.format(
+    return _TEMPLATE_PLAIN.format(
         cot_block=cot_block,
         schema=schema,
         few_shot_block=few_shot_block,

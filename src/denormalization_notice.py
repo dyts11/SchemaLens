@@ -1,5 +1,11 @@
 """
-Text block appended to L1/L2 prompts (denormalised 1NF / 2NF materialised schemas).
+Deduplication / denormalisation notice blocks for the LLM prompt.
+
+UNIFIED_DENORMALIZATION_NOTICE — current notice, used by prompt_builder on every
+                                 structural level (L1-L6).
+DENORMALIZATION_NOTICE         — LEGACY long L1/L2-only notice used by the
+                                 original experiments (kept for din_sql.py and
+                                 for reproducing historical prompts).
 """
 
 DENORMALIZATION_NOTICE = """\
@@ -178,4 +184,33 @@ RULE: No special handling needed for EXISTS or IN subqueries.
 | GROUP BY        | Use COUNT(DISTINCT ...) or subquery deduplication |
 | MIN / MAX       | Safe — no special handling needed                 |
 | EXISTS / IN     | Safe — no special handling needed                 |
+"""
+
+
+# ---------------------------------------------------------------------------
+# Unified notice — identical text for every structural level (L1–L6) and
+# UNCONDITIONAL: the deduplication rules apply to every query regardless of
+# whether the schema is denormalised.  It never mentions normalisation, schema
+# headers or structural levels, so no condition receives a different
+# instruction.  Examples use placeholders only — no database-specific names.
+# ---------------------------------------------------------------------------
+
+UNIFIED_DENORMALIZATION_NOTICE = """\
+### Deduplication Rules (mandatory for every query):
+
+Rows may contain the same logical record more than once. Always apply:
+
+1. SELECT      → SELECT DISTINCT, unless the question asks for every occurrence.
+2. COUNT       → COUNT(DISTINCT <entity_id>), never COUNT(*) or COUNT(<column>).
+                 <entity_id> = primary identifier of the entity being counted.
+                 Wrong:   SELECT COUNT(*) FROM <table> WHERE ...
+                 Correct: SELECT COUNT(DISTINCT <entity_id>) FROM <table> WHERE ...
+3. SUM / AVG   → aggregate over a deduplicated subquery.
+                 Wrong:   SELECT SUM(<col>) FROM <table> WHERE ...
+                 Correct: SELECT SUM(<col>)
+                          FROM (SELECT DISTINCT <entity_id>, <col> FROM <table> WHERE ...)
+4. GROUP BY    → combine with COUNT(DISTINCT <entity_id>) or the subquery in rule 3.
+5. MIN / MAX, EXISTS / IN → safe, no change needed.
+
+These rules apply to every query, whether or not duplicates seem likely.
 """

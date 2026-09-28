@@ -1,6 +1,6 @@
 #!/bin/bash
 # GPU worker: BIRD few-shot experiment (3-shot, fixed per-DB examples).
-# 465 questions (33 reserved as examples) x 15 conditions (L1-L2,L4-L6 x S1-S3).
+# 465 questions (33 reserved as examples) x 18 conditions (L1-L6 x S1-S3).
 # Submitted by slurm/submit_fewshot.sh
 #
 # Conditions use run_experiment.py defaults (not passed via --export to avoid
@@ -42,7 +42,7 @@ echo "SLURM_JOB_ID=${SLURM_JOB_ID:-}"
 echo "MODEL=${MODEL}"
 echo "FEW_SHOT_N=${FEW_SHOT_N}"
 echo "RESULTS_DIR=${SCHEMA_EFFECT_ROOT}/${RESULTS_DIR}"
-echo "Conditions: L1-L2,L4-L6 x S1-S3 (15, defaults in run_experiment.py)"
+echo "Conditions: L1-L6 x S1-S3 (18, defaults in run_experiment.py)"
 echo "Questions: 465 (498 arcwise minus 33 reserved few-shot examples)"
 echo "SCHEMA_EFFECT_ROOT=${SCHEMA_EFFECT_ROOT}"
 echo "LOCAL_MODELS_DIR=${LOCAL_MODELS_DIR}"

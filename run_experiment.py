@@ -7,15 +7,24 @@ Results are written row-by-row to a CSV file so progress is never lost.
 Checkpointing: if the output CSV already exists, rows that have already been
 completed are skipped — you can safely interrupt and resume at any time.
 
+Prompt: every condition (L1-L6 x S1-S3) uses the same template. By default
+the Deduplication Rules notice is included; ``--no-notice`` drops it on every
+condition. The two modes write to different default directories so they never
+overwrite each other.
+
 Usage:
-    python run_experiment.py
+    python run_experiment.py                       # notice on, all 18 conditions
+    python run_experiment.py --no-notice
     python run_experiment.py --spider-dir dev_20240627/spider_data \\
         --condition L3S3 --models gemini-2.5-flash
 
-Output:
-    results/ or results/spider/   — one CSV per (model, condition)
+Output (one CSV per (model, condition)):
+    results/unified_notice/            default
+    results/no_notice/                 with --no-notice
+    results/<mode>/spider/             in Spider mode
+    any path given with --results-dir overrides these
 
-Columns in results.csv:
+CSV columns:
     question_id, db_id, difficulty, question_type,
     structural_level, semantic_level, model,
     gold_sql, predicted_sql, outcome, correct, error_msg
@@ -44,7 +53,7 @@ try:
 except ImportError:
     pass  # dotenv not installed — keys must be set as environment variables
 
-from src.schema_builder import SchemaBuilder
+from src.schema_builder import SchemaBuilder, L1_DB_IDS, L2_DB_IDS
 from src.prompt_builder import build_prompt
 from src.llm_runner import call_llm
 from src.few_shot import (
@@ -58,6 +67,7 @@ from src.evaluator import (
     build_col_rename_map,
     build_l1_col_rename_map,
     build_l2_col_rename_map,
+    _build_pred_connection,
 )
 from preprocess_data.data_layout import DataLayout
 from preprocess_data.questions.question_classifier import load_question_types
@@ -69,7 +79,8 @@ from preprocess_data.questions.question_classifier import load_question_types
 DATA_DIR = "dev_20240627"
 ARCWISE_QUESTIONS_PATH = os.path.join(DATA_DIR, "arcwise_plat_sql.json")
 DEV_JSON_PATH = os.path.join(DATA_DIR, "dev.json")
-RESULTS_DIR = "results"
+RESULTS_DIR_NOTICE = "results/unified_notice"
+RESULTS_DIR_NO_NOTICE = "results/no_notice"
 QUESTIONS_DIR = "preprocess_data/questions"
 
 # ---------------------------------------------------------------------------
@@ -106,7 +117,7 @@ def results_file(
       results/llama-3.3-70b-or__L3S3__cot__ev.csv     (cot + evidence)
     """
     safe_model = model.replace("/", "-")
-    out_dir = results_dir or RESULTS_DIR
+    out_dir = results_dir or RESULTS_DIR_NOTICE
     fs_suffix = f"__fs{few_shot_n}" if few_shot_n > 0 else ""
     cot_suffix = "__cot" if cot else ""
     ev_suffix = "__ev" if evidence else ""
@@ -139,7 +150,14 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p.add_argument(
         "--results-dir",
         default=None,
-        help="Output directory (default: results/spider in Spider mode, else results).",
+        help="Output directory (default: results/unified_notice or results/no_notice, "
+             "plus /spider in Spider mode).",
+    )
+    p.add_argument(
+        "--no-notice",
+        action="store_true",
+        default=False,
+        help="Drop the Deduplication Rules notice from every prompt (default: included).",
     )
     p.add_argument(
         "--condition",
@@ -176,16 +194,8 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     )
     return p.parse_args(argv)
 
-# Conditions to run: list of (structural_level, semantic_level) tuples
-# Remaining Spider (gemini-2.5 L3S1–S3 done). Reset to all 18 for full runs:
-#   [(s, m) for s in range(1, 7) for m in range(1, 4)]
-CONDITIONS = [
-    (1, 1), (1, 2), (1, 3),
-    (2, 1), (2, 2), (2, 3),
-    (4, 1), (4, 2), (4, 3),
-    (5, 1), (5, 2), (5, 3),
-    (6, 1), (6, 2), (6, 3),
-]
+# Conditions to run when --condition is not given: the full 6 x 3 grid.
+CONDITIONS = [(s, m) for s in range(1, 7) for m in range(1, 4)]
 
 # Models to run
 MODELS = [
@@ -469,20 +479,23 @@ def run(
     few_shot_n: Optional[int] = None,
     cot: bool = False,
     evidence: bool = False,
+    include_notice: bool = True,
 ) -> None:
     active_spider_dir = spider_dir if spider_dir is not None else SPIDER_DIR
     layout = DataLayout.create(DATA_DIR, spider_dir=active_spider_dir)
     spider_mode = layout.layout == "spider"
-    active_results_dir = (
-        results_dir
-        if results_dir is not None
-        else ("results/spider" if spider_mode else RESULTS_DIR)
-    )
+    if results_dir is not None:
+        active_results_dir = results_dir
+    else:
+        active_results_dir = RESULTS_DIR_NOTICE if include_notice else RESULTS_DIR_NO_NOTICE
+        if spider_mode:
+            active_results_dir = os.path.join(active_results_dir, "spider")
     active_conditions = conditions if conditions is not None else CONDITIONS
     active_models = models if models is not None else MODELS
     active_few_shot_n = few_shot_n if few_shot_n is not None else FEW_SHOT_N
     active_cot = cot
     active_evidence = evidence
+    active_notice = include_notice
     tables_path = str(layout.tables_json)
 
     os.makedirs(active_results_dir, exist_ok=True)
@@ -566,8 +579,6 @@ def run(
     # so the evaluator can run predicted SQL against correctly-named views.
     # Returns None when no renaming is needed (e.g. S3 with original names).
     sem_levels_needed = {sem for _, sem in active_conditions}
-    from src.schema_builder import L1_DB_IDS, L2_DB_IDS
-
     rename_maps = {
         (db_id, sem): build_col_rename_map(db_id, DATA_DIR, sem, tables_path)
         for db_id in db_ids
@@ -589,6 +600,7 @@ def run(
 
     total_runs = len(active_conditions) * len(active_models) * len(questions)
     print(f"\nTotal runs planned : {total_runs}")
+    print(f"Prompt notice      : {'on (Deduplication Rules, all conditions)' if active_notice else 'off'}")
     print(f"Results directory  : {active_results_dir}/")
     print()
 
@@ -669,49 +681,18 @@ def run(
                         few_shot_examples=few_shot_examples,
                         include_cot=active_cot,
                         evidence=q.get("evidence") if active_evidence else None,
+                        include_denorm_notice=active_notice,
                     )
 
-                    #print(
-                    #    f"\n  → question_id={q['question_id']} ({db_id}) "
-                    #    f"[{condition_label}] calling LLM…",
-                    #    flush=True,
-                    #)
-                    t_llm = time.time()
                     predicted_sql = call_llm(model, prompt)
-                    #print(
-                    #    f"  ← LLM returned in {time.time() - t_llm:.1f}s "
-                    #    f"(pred len={len(predicted_sql or '')})",
-                    #    flush=True,
-                    #)
 
                     if struct_level in (1, 2):
-                        from src.evaluator import _build_pred_connection
-
+                        # Materialised 1NF/2NF DB (existence checked by validate_run_prerequisites)
                         if struct_level == 1:
-                            mat_path = str(
-                                SchemaBuilder.one_nf_sqlite_path(DATA_DIR, db_id, layout)
-                            )
-                            if not SchemaBuilder.has_one_nf_database(
-                                DATA_DIR, db_id, layout
-                            ):
-                                raise FileNotFoundError(
-                                    f"Missing 1NF DB for {db_id}: {mat_path}\n"
-                                    f"Build: python3 -m preprocess_data.to_1nf.build_sqlite "
-                                    f"--db {db_id}"
-                                )
+                            mat_path = str(SchemaBuilder.one_nf_sqlite_path(DATA_DIR, db_id, layout))
                             mat_rename = l1_rename_maps.get((db_id, sem_level))
                         else:
-                            mat_path = str(
-                                SchemaBuilder.two_nf_sqlite_path(DATA_DIR, db_id, layout)
-                            )
-                            if not SchemaBuilder.has_two_nf_database(
-                                DATA_DIR, db_id, layout
-                            ):
-                                raise FileNotFoundError(
-                                    f"Missing 2NF DB for {db_id}: {mat_path}\n"
-                                    f"Build: python3 -m preprocess_data.to_2nf.build_sqlite "
-                                    f"--db {db_id}"
-                                )
+                            mat_path = str(SchemaBuilder.two_nf_sqlite_path(DATA_DIR, db_id, layout))
                             mat_rename = l2_rename_maps.get((db_id, sem_level))
 
                         conn_key = (db_id, struct_level)
@@ -719,8 +700,6 @@ def run(
                             pred_conn_by_db[conn_key] = _build_pred_connection(
                                 mat_path, mat_rename or {}
                             )
-                        #print("  → evaluating SQL…", flush=True)
-                        t_eval = time.time()
                         result = evaluate(
                             db_path,
                             predicted_sql,
@@ -730,15 +709,8 @@ def run(
                             pred_reuse_connection=pred_conn_by_db[conn_key],
                             verbose=False,
                         )
-                        #print(
-                        #    f"  ← eval done in {time.time() - t_eval:.1f}s "
-                        #    f"({result.outcome})",
-                        #    flush=True,
-                        #)
                     else:
                         col_rename_map = rename_maps.get((db_id, sem_level))
-                        #print("  → evaluating SQL…", flush=True)
-                        t_eval = time.time()
                         result = evaluate(
                             db_path,
                             predicted_sql,
@@ -746,11 +718,6 @@ def run(
                             col_rename_map=col_rename_map,
                             verbose=False,
                         )
-                        #print(
-                        #    f"  ← eval done in {time.time() - t_eval:.1f}s "
-                        #    f"({result.outcome})",
-                        #    flush=True,
-                        #)
 
                     # Write result immediately (so nothing is lost on crash)
                     row = {
@@ -811,4 +778,5 @@ if __name__ == "__main__":
         few_shot_n=args.few_shot,
         cot=args.cot,
         evidence=args.evidence,
+        include_notice=not args.no_notice,
     )
