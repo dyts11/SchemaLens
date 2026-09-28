@@ -13,30 +13,29 @@ Row definitions (per column, comparing the S2/S3 name to the original after norm
 
 | database | columns | A | B | C | D (fallback) | S2≠orig | S3≠orig | S2≠S3 | has BIRD desc | S3 = BIRD column_name |
 |--|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|
-| california_schools | 89 | 9 (10%) | 17 (19%) | 48 (54%) | 15 (17%) | 73% | 64% | 82% | 81% | 11% |
-| debit_card_specializing | 21 | 0 (0%) | 7 (33%) | 10 (48%) | 4 (19%) | 81% | 48% | 71% | 95% | 43% |
-| european_football_2 | 199 | 30 (15%) | 39 (20%) | 97 (49%) | 33 (17%) | 68% | 64% | 83% | 52% | 20% |
-| financial | 55 | 3 (5%) | 9 (16%) | 25 (45%) | 18 (33%) | 62% | 51% | 65% | 87% | 20% |
-| formula_1 | 94 | 9 (10%) | 5 (5%) | 41 (44%) | 39 (41%) | 49% | 53% | 48% | 96% | 37% |
-| student_club | 48 | 2 (4%) | 25 (52%) | 11 (23%) | 10 (21%) | 75% | 27% | 79% | 100% | 33% |
-| superhero | 31 | 0 (0%) | 17 (55%) | 0 (0%) | 14 (45%) | 55% | 0% | 55% | 100% | 58% |
-| thrombosis_prediction | 64 | 49 (77%) | 4 (6%) | 2 (3%) | 9 (14%) | 9% | 80% | 86% | 95% | 36% |
+| california_schools | 89 | 10 (11%) | 27 (30%) | 51 (57%) | 1 (1%) | 88% | 69% | 98% | 81% | 12% |
+| debit_card_specializing | 21 | 0 (0%) | 11 (52%) | 10 (48%) | 0 (0%) | 100% | 48% | 100% | 95% | 43% |
+| european_football_2 | 199 | 30 (15%) | 129 (65%) | 33 (17%) | 7 (4%) | 81% | 32% | 96% | 52% | 26% |
+| financial | 55 | 18 (33%) | 35 (64%) | 2 (4%) | 0 (0%) | 67% | 36% | 100% | 87% | 20% |
+| formula_1 | 94 | 7 (7%) | 44 (47%) | 38 (40%) | 5 (5%) | 87% | 48% | 95% | 96% | 41% |
+| student_club | 48 | 0 (0%) | 47 (98%) | 0 (0%) | 1 (2%) | 98% | 0% | 98% | 100% | 50% |
+| superhero | 31 | 0 (0%) | 21 (68%) | 2 (6%) | 8 (26%) | 74% | 6% | 74% | 100% | 52% |
+| thrombosis_prediction | 64 | 49 (77%) | 10 (16%) | 1 (2%) | 4 (6%) | 17% | 78% | 94% | 95% | 31% |
 | toxicology | 11 | 0 (0%) | 11 (100%) | 0 (0%) | 0 (0%) | 100% | 0% | 100% | 100% | 45% |
-| car_1 | 23 | 1 (4%) | 1 (4%) | 21 (91%) | 0 (0%) | 96% | 96% | 91% | 0% | 0% |
-| tvshow | 25 | 5 (20%) | 10 (40%) | 9 (36%) | 1 (4%) | 76% | 56% | 96% | 0% | 0% |
-| **all** | 660 | 108 (16%) | 145 (22%) | 264 (40%) | 143 (22%) | 62% | 56% | 76% | 73% | 25% |
+| car_1 | 23 | 2 (9%) | 13 (57%) | 6 (26%) | 2 (9%) | 83% | 35% | 91% | 0% | 0% |
+| tvshow | 25 | 0 (0%) | 18 (72%) | 4 (16%) | 3 (12%) | 88% | 16% | 88% | 0% | 0% |
+| **all** | 660 | 116 (18%) | 366 (55%) | 147 (22%) | 31 (5%) | 78% | 40% | 95% | 73% | 28% |
 
 Fallback (row D) columns, i.e. identical at S2 and S3:
 
-- california_schools (15): `IRC`, `County`, `District`, `School`, `Street`, `City`, `Zip`, `State`, `Phone`, `Website`, `Charter`, `Virtual`, `Magnet`, `Latitude`, `Longitude`
-- debit_card_specializing (4): `Date`, `Time`, `Price`, `Date`
-- european_football_2 (33): `id`, `date`, `potential`, `volleys`, `curve`, `agility`, `balance`, `stamina`, `strength`, `vision`, `marking`, `id`, `id`, `country_id`, `name`, `id`, `name`, `id`, `team_api_id`, `id`, `team_api_id`, `date`, `id`, `country_id`, `league_id`, `season`, `stage`, `date`, `match_api_id`, `goal`, `card`, `cross`, `corner`
-- financial (18): `date`, `card_id`, `type`, `client_id`, `gender`, `client_id`, `type`, `loan_id`, `date`, `amount`, `status`, `order_id`, `amount`, `date`, `type`, `amount`, `bank`, `account`
-- formula_1 (39): `name`, `location`, `country`, `url`, `name`, `url`, `number`, `url`, `year`, `url`, `year`, `round`, `name`, `date`, `time`, `url`, `points`, `status`, `points`, `position`, `wins`, `points`, `position`, `wins`, `lap`, `position`, `time`, `lap`, `time`, `duration`, `number`, `position`, `status`, `number`, `position`, `points`, `laps`, `time`, `rank`
-- student_club (10): `type`, `notes`, `status`, `type`, `city`, `state`, `cost`, `notes`, `email`, `phone`
-- superhero (14): `id`, `id`, `id`, `id`, `gender`, `id`, `id`, `race`, `id`, `gender_id`, `race_id`, `hero_id`, `id`, `hero_id`
-- thrombosis_prediction (9): `ID`, `Symptoms`, `ID`, `SEX`, `ID`, `Date`, `PIC`, `TAT`, `TAT2`
-- tvshow (1): `Rating`
+- california_schools (1): `Zip`
+- european_football_2 (7): `id`, `id`, `id`, `id`, `id`, `id`, `id`
+- formula_1 (5): `url`, `url`, `url`, `url`, `url`
+- student_club (1): `zip`
+- superhero (8): `id`, `id`, `id`, `id`, `id`, `id`, `id`, `id`
+- thrombosis_prediction (4): `ID`, `ID`, `SEX`, `ID`
+- car_1 (2): `Id`, `Id`
+- tvshow (3): `id`, `id`, `id`
 
 ## 2. Collision check
 
@@ -45,13 +44,13 @@ A collision = two distinct original columns in the same table (L3-L6), in the L1
 | database | level | L3-L6 per-table collisions | L1 wide-table collisions | L2 per-cluster collisions | cross-table same-name (L3-L6, informational) |
 |--|--|--:|--:|--:|--:|
 | california_schools | S1 | 0 | 0 | 0 | — |
-| california_schools | S2 | 0 | 0 | 0 | 2 |
+| california_schools | S2 | 0 | 0 | 0 | 1 |
 | california_schools | S3 | 0 | 0 | 0 | 4 |
 | debit_card_specializing | S1 | 0 | 0 | 0 | — |
 | debit_card_specializing | S2 | 0 | 0 | 0 | 5 |
 | debit_card_specializing | S3 | 0 | 0 | 0 | 5 |
 | european_football_2 | S1 | 0 | 0 | 0 | — |
-| european_football_2 | S2 | 0 | 0 | 0 | 9 |
+| european_football_2 | S2 | 0 | 0 | 0 | 8 |
 | european_football_2 | S3 | 0 | 0 | 0 | 8 |
 | financial | S1 | 0 | 0 | 0 | — |
 | financial | S2 | 0 | 0 | 0 | 8 |
@@ -60,8 +59,8 @@ A collision = two distinct original columns in the same table (L3-L6), in the L1
 | formula_1 | S2 | 0 | 0 | 0 | 18 |
 | formula_1 | S3 | 0 | 0 | 0 | 18 |
 | student_club | S1 | 0 | 0 | 0 | — |
-| student_club | S2 | 0 | 0 | 0 | 7 |
-| student_club | S3 | 0 | 0 | 0 | 8 |
+| student_club | S2 | 0 | 0 | 0 | 5 |
+| student_club | S3 | 0 | 0 | 0 | 5 |
 | superhero | S1 | 0 | 0 | 0 | — |
 | superhero | S2 | 0 | 0 | 0 | 2 |
 | superhero | S3 | 0 | 0 | 0 | 2 |
@@ -72,8 +71,8 @@ A collision = two distinct original columns in the same table (L3-L6), in the L1
 | toxicology | S2 | 0 | 0 | 0 | 3 |
 | toxicology | S3 | 0 | 0 | 0 | 3 |
 | car_1 | S1 | 0 | 0 | 0 | — |
-| car_1 | S2 | 0 | 0 | 0 | 5 |
-| car_1 | S3 | 0 | 0 | 0 | 5 |
+| car_1 | S2 | 0 | 0 | 0 | 4 |
+| car_1 | S3 | 0 | 0 | 0 | 4 |
 | tvshow | S1 | 0 | 0 | 0 | — |
 | tvshow | S2 | 0 | 0 | 0 | 2 |
 | tvshow | S3 | 0 | 0 | 0 | 2 |
@@ -86,39 +85,36 @@ No collisions found at any level.
 |--|--|--|--|--|--|--|
 | california_schools | frpm | `CDSCode` | `col_a` | `cds_cd` | `county_district_school_code` | C |
 | california_schools | frpm | `Academic Year` | `col_b` | `acad_yr` | `academic_year` | B |
-| california_schools | frpm | `IRC` | `col_p` | `irc` | `irc` | D |
-| california_schools | satscores | `cds` | `col_a` | `cds` | `county_district_school_code` | A |
+| california_schools | frpm | `IRC` | `col_p` | `irc` | `independently_reporting_charter` | A |
+| california_schools | schools | `Zip` | `col_k` | `zip` | `zip` | D |
 | debit_card_specializing | customers | `CustomerID` | `col_a` | `cust_id` | `customer_id` | C |
 | debit_card_specializing | customers | `Segment` | `col_b` | `seg` | `segment` | B |
-| debit_card_specializing | transactions_1k | `Date` | `col_b` | `date` | `date` | D |
 | european_football_2 | Player_Attributes | `id` | `col_a` | `id` | `id` | D |
-| european_football_2 | Player_Attributes | `player_fifa_api_id` | `col_b` | `fifa_api_id` | `player_fifa_api_id` | B |
-| european_football_2 | Player_Attributes | `gk_diving` | `col_al` | `gk_div` | `goalkeeper_diving` | C |
-| european_football_2 | Match | `B365H` | `col_ch` | `b365h` | `bet365_home_odds` | A |
+| european_football_2 | Player_Attributes | `player_fifa_api_id` | `col_b` | `plyr_fifa_api_id` | `player_federation_internationale_de_football_association_api_id` | C |
+| european_football_2 | Player_Attributes | `player_api_id` | `col_c` | `plyr_api_id` | `player_api_id` | B |
+| european_football_2 | Match | `shoton` | `col_ca` | `shoton` | `shot_on` | A |
 | financial | account | `account_id` | `col_a` | `acct_id` | `account_id` | B |
-| financial | account | `frequency` | `col_c` | `freq` | `statement_frequency` | C |
-| financial | account | `date` | `col_d` | `date` | `date` | D |
 | financial | card | `disp_id` | `col_b` | `disp_id` | `disposition_id` | A |
+| financial | order | `k_symbol` | `col_f` | `k_sym` | `constant_symbol` | C |
 | formula_1 | circuits | `circuitId` | `col_a` | `cir_id` | `circuit_id` | C |
-| formula_1 | circuits | `name` | `col_c` | `name` | `name` | D |
+| formula_1 | circuits | `name` | `col_c` | `nm` | `name` | B |
 | formula_1 | circuits | `lat` | `col_f` | `lat` | `latitude` | A |
-| formula_1 | constructors | `nationality` | `col_d` | `nation` | `nationality` | B |
+| formula_1 | circuits | `url` | `col_i` | `url` | `url` | D |
 | student_club | event | `event_id` | `col_a` | `evt_id` | `event_id` | B |
-| student_club | event | `type` | `col_d` | `type` | `type` | D |
-| student_club | zip_code | `short_state` | `col_f` | `st` | `state_abbr` | C |
-| student_club | budget | `spent` | `col_c` | `spent` | `amount_spent` | A |
+| student_club | member | `zip` | `col_h` | `zip` | `zip` | D |
 | superhero | alignment | `id` | `col_a` | `id` | `id` | D |
-| superhero | alignment | `alignment` | `col_b` | `align` | `alignment` | B |
-| thrombosis_prediction | Examination | `ID` | `col_a` | `ID` | `ID` | D |
+| superhero | alignment | `alignment` | `col_b` | `algn` | `alignment` | B |
+| superhero | superhero | `height_cm` | `col_k` | `ht_cm` | `height_centimeter` | C |
+| thrombosis_prediction | Examination | `ID` | `col_a` | `id` | `id` | D |
 | thrombosis_prediction | Examination | `Examination Date` | `col_b` | `exam_dt` | `examination_date` | B |
-| thrombosis_prediction | Examination | `aCL IgG` | `col_c` | `acl_igg` | `anticardiolipin_igg` | A |
-| thrombosis_prediction | Patient | `Description` | `col_d` | `first_rec_dt` | `first_record_date` | C |
+| thrombosis_prediction | Examination | `aCL IgG` | `col_c` | `acl_igg` | `anticardiolipin_immunoglobulin_g` | A |
+| thrombosis_prediction | Examination | `ANA Pattern` | `col_f` | `ana_ptrn` | `antinuclear_antibody_pattern` | C |
 | toxicology | atom | `atom_id` | `col_a` | `atm_id` | `atom_id` | B |
 | car_1 | continents | `ContId` | `col_a` | `cont_id` | `continent_id` | C |
+| car_1 | continents | `Continent` | `col_b` | `cont` | `continent` | B |
+| car_1 | car_makers | `Id` | `col_a` | `id` | `id` | D |
 | car_1 | cars_data | `MPG` | `col_b` | `mpg` | `miles_per_gallon` | A |
-| car_1 | cars_data | `Horsepower` | `col_e` | `hp` | `horsepower` | B |
-| tvshow | TV_Channel | `id` | `col_a` | `rec_id` | `record_id` | C |
-| tvshow | TV_Channel | `series_name` | `col_b` | `series_nm` | `series_name` | B |
-| tvshow | TV_Channel | `Content` | `col_e` | `content` | `content_type` | A |
-| tvshow | TV_series | `Rating` | `col_d` | `rating` | `rating` | D |
+| tvshow | TV_Channel | `id` | `col_a` | `id` | `id` | D |
+| tvshow | TV_Channel | `series_name` | `col_b` | `ser_nm` | `series_name` | B |
+| tvshow | TV_Channel | `Pixel_aspect_ratio_PAR` | `col_f` | `pixel_aspt_rto_par` | `pixel_aspect_ratio_pixel_aspect_ratio` | C |
 
